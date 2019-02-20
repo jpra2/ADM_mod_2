@@ -2,7 +2,8 @@ import numpy as np
 # from math import pi, sqrt
 from pymoab import core, types, rng, topo_util, skinner
 # import time
-import pyximport; pyximport.install()
+# import pyximport; pyximport.install()
+import os
 # from PyTrilinos import Epetra, AztecOO, EpetraExt  # , Amesos
 # import math
 # import os
@@ -12,8 +13,18 @@ import sys
 # import configparser
 import io
 import yaml
-import pymoab_utils as utpy
 import scipy.sparse as sp
+
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+parent_parent_dir = os.path.dirname(parent_dir)
+input_dir = os.path.join(parent_parent_dir, 'input')
+flying_dir = os.path.join(parent_parent_dir, 'flying')
+utils_dir = os.path.join(parent_parent_dir, 'utils')
+output_dir = os.path.join(parent_parent_dir, 'output')
+
+import importlib.machinery
+loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
+utpy = loader.load_module('pymoab_utils')
 
 class OtherUtils:
     name_keq_tag = 'K_EQ'
@@ -456,10 +467,10 @@ class OtherUtils:
         """
         """
         # mtu = topo_util.MeshTopoUtil(mb)
-        keq_tag = mb.tag_get_handle(name_keq_tag)
-        s_grav_tag = mb.tag_get_handle(name_s_grav)
-        perm_tag = mb.tag_get_handle(name_perm_tag)
-        area_tag = mb.tag_get_handle(name_area_tag)
+        keq_tag = mb.tag_get_handle(OtherUtils.name_keq_tag)
+        s_grav_tag = mb.tag_get_handle(OtherUtils.name_s_grav)
+        perm_tag = mb.tag_get_handle(OtherUtils.name_perm_tag)
+        area_tag = mb.tag_get_handle(OtherUtils.name_area_tag)
 
         elements = rng.Range(list(map_global.keys()))
         n = len(elements)
@@ -467,13 +478,13 @@ class OtherUtils:
         all_s_gravs = []
 
         if faces_in == None:
-            all_faces = utpy.get_all_faces(mb, rng.Range(elements))
+            all_faces = utpy.get_faces(mb, rng.Range(elements))
             # bound_faces = utpy.get_boundary_of_volumes(mb, elements)
             # faces = rng.subtract(all_faces, bound_faces)
             faces = rng.subtract(all_faces, utpy.get_boundary_of_volumes(mb, elements))
         else:
             faces = faces_in
-            all_faces = utpy.get_all_faces(mb, rng.Range(elements))
+            all_faces = utpy.get_faces(mb, rng.Range(elements))
 
         T = sp.lil_matrix((n, n))
         s = np.zeros(n)

@@ -4,7 +4,7 @@ from pymoab import core, types, rng, topo_util, skinner
 
 def get_faces(mb, elements):
     mtu = topo_util.MeshTopoUtil(mb)
-    elements = UtilsPymoab.get_elements(mb, elements)
+    elements = get_elements(mb, elements)
     faces = mtu.get_bridge_adjacencies(elements, 3, 2)
     return faces
 

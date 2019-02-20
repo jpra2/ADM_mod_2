@@ -5,8 +5,8 @@ import time
 import os
 import scipy
 import cython
-from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity
-
+from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, lil_matrix, find
+from utils.others_utils import OtherUtils as oth
 
 class MeshManager:
     def __init__(self,mesh_file, dim=3):
@@ -625,7 +625,7 @@ for i in range(len(lx2)-1):
 print('Criação da árvore: ',time.time()-t0)
 ta=time.time()
 all_volumes=M1.all_volumes
-
+'''
 vert_meshset=M1.mb.create_meshset()
 
 for e in all_volumes:
@@ -654,7 +654,7 @@ for e in all_vertex_d1:
         M1.mb.tag_set_data(D1_tag, e, 2)
     elif d1_tag==4:
         M1.mb.tag_set_data(D1_tag, e, 3)
-print(time.time()-ta,"correção")
+print(time.time()-ta,"correção") '''
 print("TEMPO TOTAL DE PRÉ PROCESSAMENTO:",time.time()-tempo0_pre)
 print(" ")
 
@@ -1179,7 +1179,7 @@ G=csc_matrix((data,(lines,cols)),shape=(nv,nv))
 
 W_AMS=G*T_AMS*(G.transpose())
 
-MPFA_NO_NIVEL_2=False
+MPFA_NO_NIVEL_2=True
 #-------------------------------------------------------------------------------
 ni=nint
 nf=nfac
@@ -1315,6 +1315,7 @@ for v in M1.all_volumes:
 print(time.time()-t0,"organize OP_ADM_2_______________________________::::::::::::")
 OP_ADM_2=csc_matrix((data,(lines,cols)),shape=(n1,n2))
 #####################################################
+'''
 lines=[]
 cols=[]
 data=[]
@@ -1375,22 +1376,63 @@ data=np.concatenate([data,DAT])
 #del(DAT)
 print("op_adm_2", time.time()-ty)
 
-OP_ADM_3=csc_matrix((data,(lines,cols)),shape=(n1,n2))
+OP_ADM_3=csc_matrix((data,(lines,cols)),shape=(n1,n2))'''
 #OP_ADM_2=OP_ADM_3
 
 ####################################################
 #OR_ADM_2=np.zeros((n2,len(T_ADM)),dtype=np.int)
-lines=[]
-cols=[]
-data=[]
-for v in M1.all_volumes:
-    elem_ID2 = int(M1.mb.tag_get_data(L2_ID_tag, v, flat=True))
-    elem_Global_ID = int(M1.mb.tag_get_data(L1_ID_tag, v, flat=True))
-    lines.append(elem_ID2)
-    cols.append(elem_Global_ID)
-    data.append(1)
-    #OR_ADM_2[elem_ID2][elem_Global_ID]=1
-OR_ADM_2=csc_matrix((data,(lines,cols)),shape=(n2,n1))
+# lines=[]
+# cols=[]
+# data=[]
+t0 = time.time()
+all_ids_adm_nv1 = np.unique(M1.mb.tag_get_data(L1_ID_tag, M1.all_volumes, flat=True))
+all_ids_adm_nv2 = np.unique(M1.mb.tag_get_data(L2_ID_tag, M1.all_volumes, flat=True))
+OR_ADM22 = lil_matrix((len(all_ids_adm_nv2), len(all_ids_adm_nv1)))
+elems_nv0 = M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
+elems_nv1 = M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([2]))
+elems_nv2 = M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([3]))
+ID_ADM_nv2_elems_nv0 = M1.mb.tag_get_data(L2_ID_tag, elems_nv0, flat=True)
+ID_ADM_nv1_elems_nv0 = M1.mb.tag_get_data(L1_ID_tag, elems_nv0, flat=True)
+OR_ADM22[ID_ADM_nv2_elems_nv0, ID_ADM_nv1_elems_nv0] = np.ones(len(ID_ADM_nv1_elems_nv0))
+ID_ADM_nv1_elems_nv1 = np.unique(M1.mb.tag_get_data(L1_ID_tag, elems_nv1, flat=True))
+ID_ADM_nv2_elems_nv1 = np.unique(M1.mb.tag_get_data(L2_ID_tag, elems_nv1, flat=True))
+OR_ADM22[ID_ADM_nv2_elems_nv1, ID_ADM_nv1_elems_nv1] = np.ones(len(ID_ADM_nv1_elems_nv1))
+
+ms2 = set()
+for elem in elems_nv2:
+    if elem in ms2:
+        continue
+    nc = M1.mb.tag_get_data(fine_to_primal2_classic_tag, elem, flat=True)[0]
+    meshset_nv2 = M1.mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([nc]))[0]
+    elems_2 = M1.mb.get_entities_by_handle(meshset_nv2)
+    ms2 = ms2 | set(elems_2)
+    id_adm_nv2_elems_2 = np.unique(M1.mb.tag_get_data(L2_ID_tag, elems_2, flat=True))[0]
+    # if elem not in elems_nv2:
+    #     print('erro')
+    #     import pdb; pdb.set_trace()
+    meshsets_nv1 = M1.mb.get_child_meshsets(meshset_nv2)
+    elems_1 = [M1.mb.get_entities_by_handle(m) for m in meshsets_nv1]
+    ids_adm_elems_1 = np.array([np.unique(M1.mb.tag_get_data(L1_ID_tag, elems, flat=True))[0] for elems in elems_1])
+    id_adm_nv2_elems_2 = np.repeat(id_adm_nv2_elems_2, len(ids_adm_elems_1))
+    OR_ADM22[id_adm_nv2_elems_2, ids_adm_elems_1] = np.ones(len(ids_adm_elems_1))
+
+t1 = time.time()
+print('tempo or adm 2')
+print(t1 - t0)
+import pdb; pdb.set_trace()
+
+#
+# for v in M1.all_volumes:
+#     elem_ID2 = int(M1.mb.tag_get_data(L2_ID_tag, v, flat=True))
+#     elem_Global_ID = int(M1.mb.tag_get_data(L1_ID_tag, v, flat=True))
+#     lines.append(elem_ID2)
+#     cols.append(elem_Global_ID)
+#     data.append(1)
+#     #OR_ADM_2[elem_ID2][elem_Global_ID]=1
+# OR_ADM_2=csc_matrix((data,(lines,cols)),shape=(n2,n1))
+
+
+OR_ADM_2 = OR_ADM22.tocsc(copy=True)
 T_ADM_2=OR_ADM_2*T_ADM*OP_ADM_2
 
 #-------------------------------------------------------------------------------
