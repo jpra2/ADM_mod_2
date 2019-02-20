@@ -14,8 +14,15 @@ import sys
 import io
 import yaml
 import scipy.sparse as sp
-from scipy.sparse import linalg
 
 
-def get_OR_classic_nv1(mb, all_volumes, L1_ID_tag, ID_reord_tag, L3_ID_tag):
-    elems_nv0 = mb.get_entities_by_type_and_tag()
+def get_OR_classic_nv1(mb, all_volumes, ID_reord_tag, primal_id_tag1, fine_to_primal1_classic_tag):
+    meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
+    OR1 = sp.lil_matrix((len(meshsets_nv1), len(all_volumes)))
+    for m in meshsets_nv1:
+        elems = mb.get_entities_by_handle(m)
+        gids = mb.tag_get_data(ID_reord_tag, elems, flat=True)
+        nc = mb.tag_get_data(fine_to_primal1_classic_tag, elems, flat=True)
+        OR1[nc, gids] = np.ones(len(elems))
+
+    return OR1

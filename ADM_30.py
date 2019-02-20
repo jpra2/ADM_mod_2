@@ -7,7 +7,10 @@ import scipy
 import cython
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, lil_matrix, find
 from utils.others_utils import OtherUtils as oth
-from utils import prolongation_classic as prol1
+from utils import prolongation_ams as prol1
+from utils import restriction_classic as restc
+from utils import pymoab_utils as utpy
+from utils import restriction_adm as resta
 from preprocessor.mesh_manager import MeshManager
 
 
@@ -586,6 +589,20 @@ for i, elems in enumerate(l_elems):
     M1.mb.tag_set_data(M1.ID_reordenado_tag,elems,np.arange(l_ids[i],l_ids[i+1]))
 
 
+
+
+list_names_tags = ['PERM', 'PHI', 'CENT', 'finos', 'P', 'Q', 'FACES_BOUNDARY', 'AREA',
+                   'G_ID_tag', 'ID_reord_tag', 'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC',
+                   'PRIMAL_ID_1', 'PRIMAL_ID_2', 'd1', 'd2', 'K_EQ', 'S_GRAV', 'l1_ID',
+                   'l2_ID', 'l3_ID']
+tags_1 = utpy.get_all_tags_1(M1.mb, list_names_tags)
+
+def get_tag(name):
+    global list_names_tags
+    global tags_1
+    index = list_names_tags.index(name)
+    return tags_1[index]
+
 faces_boundary_tag = M1.mb.tag_get_handle('FACES_BOUNDARY')
 ids_wirebasket = M1.mb.tag_get_data(M1.ID_reordenado_tag, M1.all_volumes, flat=True)
 map_global = dict(zip(M1.all_volumes, ids_wirebasket))
@@ -604,7 +621,24 @@ T_mod[inds_T_mod[0], inds_T_mod[1]] = inds_T_mod[2]
 t0=time.time()
 OP_ams_nv1 = prol1.get_op_AMS_TPFA(T_mod, wirebasket_numbers)
 t2 = time.time()
+print('tempo op1')
 print(t2-t1)
+
+t0=time.time()
+OR_ams_nv1 = restc.get_OR_classic_nv1(M1.mb, M1.all_volumes, get_tag('ID_reord_tag'), get_tag('PRIMAL_ID_1'), get_tag('FINE_TO_PRIMAL1_CLASSIC'))
+t2 = time.time()
+print('tempo or1')
+print(t2-t1)
+
+OR_adm_nv1 = resta.get_OR_adm_nv1(M1.mb, M1.all_volumes, get_tag('ID_reord_tag'), get_tag('l1_ID'), get_tag('l3_ID'), get_tag('d1'), get_tag('FINE_TO_PRIMAL1_CLASSIC'))
+
+
+T_nv1 = OR_ams_nv1.dot(T)
+T_nv1 = T_nv1.dot(OP_ams_nv1)
+
+print(T_nv1.sum(axis=1))
+
+
 import pdb; pdb.set_trace()
 
 
