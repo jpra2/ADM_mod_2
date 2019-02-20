@@ -1,0 +1,34 @@
+input_file: '18x18x18'
+
+gravity: False
+MPFA: False
+bifasico: False
+
+rs:
+  r0: 1
+  r1: 1
+
+Ls:
+  L1: [3,3,3]
+  L2: [9,9,9]
+
+Wells_structured:
+  P1:
+    id: 'I1'
+    type_region: 'box'
+    region1: [0.0, 0.0, 0.0]
+    region2: [1.0, 1.0, 1.0]
+    type_prescription: 'neumann'
+    value: 10.0
+    type_well: 'injector'
+    type_fluid: Null
+
+  P2:
+    id: 'P1'
+    type_region: 'box'
+    region1: [17.0, 17.0, 17.0]
+    region2: [18.0, 18.0, 18.0]
+    type_prescription: 'dirichlet'
+    value: 100.0
+    type_well: 'producer'
+    type_fluid: Null
