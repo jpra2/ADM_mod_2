@@ -189,10 +189,23 @@ class OtherUtils:
         return inds2, b
 
     @staticmethod
-    def set_boundary_neumann(map_local, map_values, b):
-        for v in boundary_elems:
+    def set_boundary_dirichlet_matrix(map_local, map_values, b, T):
+        t = T.shape[0]
+        T2 = T.copy()
+        zeros = np.zeros(t)
+        for v, value in map_values.items():
             gid = map_local[v]
-            b[gid] += map_values[v]
+            T2[gid] = zeros
+            T2[gid, gid] = 1.0
+            b[gid] = value
+
+        return T2, b
+
+    @staticmethod
+    def set_boundary_neumann(map_local, map_values, b):
+        for v, val in map_values.items():
+            gid = map_local[v]
+            b[gid] += val
 
         return b
 
@@ -472,7 +485,7 @@ class OtherUtils:
         perm_tag = mb.tag_get_handle(OtherUtils.name_perm_tag)
         area_tag = mb.tag_get_handle(OtherUtils.name_area_tag)
 
-        elements = rng.Range(list(map_global.keys()))
+        elements = rng.Range(np.array(list(map_global.keys())))
         n = len(elements)
         all_keqs = []
         all_s_gravs = []
@@ -537,7 +550,8 @@ class OtherUtils:
         k1 = np.dot(np.dot(k1,uni), uni)
         k2 = np.dot(np.dot(k2,uni), uni)
         area = mb.tag_get_data(area_tag, face, flat=True)[0]
-        keq = OtherUtils.kequiv(k1, k2)*area/(OtherUtils.mi*np.linalg.norm(direction))
+        # keq = OtherUtils.kequiv(k1, k2)*area/(OtherUtils.mi*np.linalg.norm(direction))
+        keq = 1.0
         z1 = OtherUtils.tz - centroid1[2]
         z2 = OtherUtils.tz - centroid2[2]
         s_gr = OtherUtils.gama*keq*(z1-z2)

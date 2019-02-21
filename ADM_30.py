@@ -10,7 +10,8 @@ from utils.others_utils import OtherUtils as oth
 from utils import prolongation_ams as prol1
 from utils import restriction_classic as restc
 from utils import pymoab_utils as utpy
-from utils import restriction_adm as resta
+from utils import restriction_adm as restm
+from utils import prolongation_adm as prolm
 from preprocessor.mesh_manager import MeshManager
 
 
@@ -207,7 +208,7 @@ for i in range(int(Lz/l2+1.01)):    lz2.append(zmin+i*l2)
 
 #-------------------------------------------------------------------------------
 press = 100.0
-vazao = -10.0
+vazao = 10.0
 dirichlet_meshset = M1.mb.create_meshset()
 neumann_meshset = M1.mb.create_meshset()
 
@@ -563,6 +564,7 @@ internos=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), 
 faces=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([1]))
 arestas=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([2]))
 vertices=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([3]))
+elems_wirebasket = np.array(list(internos) + list(faces) + list(arestas) + list(vertices))
 
 M1.mb.tag_set_data(fine_to_primal1_classic_tag,vertices,np.arange(0,len(vertices)))
 
@@ -586,7 +588,9 @@ nnv=nne+nv
 l_elems=[internos,faces,arestas,vertices]
 l_ids=[0,nni,nnf,nne,nnv]
 for i, elems in enumerate(l_elems):
-    M1.mb.tag_set_data(M1.ID_reordenado_tag,elems,np.arange(l_ids[i],l_ids[i+1]))
+    M1.mb.tag_set_data(M1.ID_reordenado_tag, elems, np.arange(l_ids[i],l_ids[i+1]))
+
+
 
 
 
@@ -604,12 +608,23 @@ def get_tag(name):
     return tags_1[index]
 
 faces_boundary_tag = M1.mb.tag_get_handle('FACES_BOUNDARY')
-ids_wirebasket = M1.mb.tag_get_data(M1.ID_reordenado_tag, M1.all_volumes, flat=True)
-map_global = dict(zip(M1.all_volumes, ids_wirebasket))
+ids_wirebasket = M1.mb.tag_get_data(M1.ID_reordenado_tag, elems_wirebasket, flat=True)
+map_global = dict(zip(elems_wirebasket, ids_wirebasket))
 faces_boundary = M1.mb.tag_get_data(faces_boundary_tag, 0, flat=True)[0]
 faces_boundary = M1.mb.get_entities_by_handle(faces_boundary)
 
 T, b = oth.fine_transmissibility_structured(M1.mb, M1.mtu, map_global, faces_in=rng.subtract(M1.all_faces, faces_boundary))
+values = M1.mb.tag_get_data(get_tag('P'), volumes_d, flat=True)
+map_values = dict(zip(volumes_d, values))
+T_fino, b = oth.set_boundary_dirichlet_matrix(map_global, map_values, b, T)
+values = M1.mb.tag_get_data(get_tag('Q'), volumes_n, flat=True)
+map_values = dict(zip(volumes_n, values))
+b = oth.set_boundary_neumann(map_global, map_values, b)
+
+pf_tag = M1.mb.tag_get_handle('PF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+Pf = linalg.spsolve(T_fino.tocsc(copy=True), b)
+M1.mb.tag_set_data(pf_tag, elems_wirebasket, Pf)
+
 
 wirebasket_numbers = [ni, nf, na, nv]
 inds_T = find(T)
@@ -617,32 +632,65 @@ inds_T = np.array([inds_T[0], inds_T[1], inds_T[2], list(T.shape)])
 inds_T_mod = oth.get_tmod_by_inds(inds_T, wirebasket_numbers)
 T_mod = lil_matrix(tuple(inds_T_mod[3]))
 T_mod[inds_T_mod[0], inds_T_mod[1]] = inds_T_mod[2]
-
+#
 t0=time.time()
 OP_ams_nv1 = prol1.get_op_AMS_TPFA(T_mod, wirebasket_numbers)
 t2 = time.time()
 print('tempo op1')
 print(t2-t1)
-
+#
 t0=time.time()
 OR_ams_nv1 = restc.get_OR_classic_nv1(M1.mb, M1.all_volumes, get_tag('ID_reord_tag'), get_tag('PRIMAL_ID_1'), get_tag('FINE_TO_PRIMAL1_CLASSIC'))
 t2 = time.time()
 print('tempo or1')
 print(t2-t1)
 
-OR_adm_nv1 = resta.get_OR_adm_nv1(M1.mb, M1.all_volumes, get_tag('ID_reord_tag'), get_tag('l1_ID'), get_tag('l3_ID'), get_tag('d1'), get_tag('FINE_TO_PRIMAL1_CLASSIC'))
+OR_adm_nv1 = restm.get_OR_adm_nv1(M1.mb,  M1.all_volumes, get_tag('ID_reord_tag'), get_tag('l1_ID'), get_tag('l3_ID'))
+t1 = time.time()
+OP_adm_nv1 = prolm.get_OP_adm_nv1(M1.mb, M1.all_volumes, OP_ams_nv1, get_tag('ID_reord_tag'), get_tag('l1_ID'), get_tag('l3_ID'), get_tag('d1'), get_tag('FINE_TO_PRIMAL1_CLASSIC'))
+t2 = time.time()
+print('tempo OP_adm_nv1')
+print(t2-t1)
 
 
-T_nv1 = OR_ams_nv1.dot(T)
-T_nv1 = T_nv1.dot(OP_ams_nv1)
+T_adm_nv1_sol = OR_adm_nv1.dot(T_fino)
+T_adm_nv1_sol = T_adm_nv1_sol.dot(OP_adm_nv1)
+b_adm_nv1 = OR_adm_nv1.dot(b)
+PC_adm_nv1 = linalg.spsolve(T_adm_nv1_sol.tocsc(), b_adm_nv1)
+PMS_adm_nv1 = OP_adm_nv1.dot(PC_adm_nv1)
 
-print(T_nv1.sum(axis=1))
+erro1_tag = M1.mb.tag_get_handle('ERRO1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+pms1_tag = M1.mb.tag_get_handle('PMS1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
+erro = 100*np.absolute((Pf - PMS_adm_nv1)/Pf)
+M1.mb.tag_set_data(erro1_tag, elems_wirebasket, erro)
+# M1.mb.tag_set_data(pf_tag, M1.all_volumes, Pf)
+M1.mb.tag_set_data(pms1_tag, elems_wirebasket, PMS_adm_nv1)
+
+print('writting h5m file')
+M1.mb.write_file('solucao1.h5m')
+
+av=M1.mb.create_meshset()
+M1.mb.add_entities(av, M1.all_volumes)
+print('writting vtk file')
+M1.mb.write_file('solucao1.vtk',[av])
+
+print('end')
 
 
-import pdb; pdb.set_trace()
+
+
+
+# T_nv1 = OR_ams_nv1.dot(T)
+# T_nv1 = T_nv1.dot(OP_ams_nv1)
+#
+# print(T_nv1.sum(axis=1))
+#
+#
+# import pdb; pdb.set_trace()
 
 
 
 
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
