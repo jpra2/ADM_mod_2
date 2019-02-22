@@ -258,7 +258,6 @@ class OtherUtils:
         output:
             inds_tc_tpfa
         """
-        import pdb; pdb.set_trace()
         nni = wirebasket_numbers[0]
         nnf = wirebasket_numbers[1] + nni
         nne = wirebasket_numbers[2] + nnf
