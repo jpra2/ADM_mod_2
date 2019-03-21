@@ -1,7 +1,7 @@
 import numpy as np
 # from math import pi, sqrt
 from pymoab import core, types, rng, topo_util, skinner
-# import time
+import time
 # import pyximport; pyximport.install()
 import os
 # from PyTrilinos import Epetra, AztecOO, EpetraExt  # , Amesos
@@ -14,6 +14,7 @@ import sys
 import io
 import yaml
 import scipy.sparse as sp
+from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -25,6 +26,8 @@ output_dir = os.path.join(parent_parent_dir, 'output')
 import importlib.machinery
 loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
 utpy = loader.load_module('pymoab_utils')
+loader = importlib.machinery.SourceFileLoader('prol_tpfa', utils_dir + '/prolongation_ams.py')
+prol_tpfa = loader.load_module('prol_tpfa')
 
 class OtherUtils:
     name_keq_tag = 'K_EQ'
@@ -39,15 +42,15 @@ class OtherUtils:
     gama = 10.0
     gravity = False
 
-    # def __init__(self, mb=None):
-    #     if mb == None:
-    #         raise RuntimeError('Defina o mb core do pymoab')
-    #
-    #     self.list_tags = [mb.tag_get_handle(name) for name in OtherUtils.list_names_tags]
-    #     self.mb = mb
-    #     self.mtu = topo_util.MeshTopoUtil(mb)
-    #     self.gravity = False
-    #     # return super().__new__(cls)
+    def __init__(self, mb=None, mtu=None):
+        if mb == None:
+            raise RuntimeError('Defina o mb core do pymoab')
+        if mtu == None:
+            raise RuntimeError('Defina o mtu do pymoab')
+
+        self.list_tags = [mb.tag_get_handle(name) for name in OtherUtils.list_names_tags]
+        self.mb = mb
+        self.mtu = topo_util.MeshTopoUtil(mb)
 
     @staticmethod
     def mount_local_problem(mb, map_local, faces_in=None):
@@ -128,7 +131,7 @@ class OtherUtils:
         else:
             return inds, b
 
-    def get_flow_on_boundary(self, elements, p_tag, bound_faces=None):
+    def get_flow_on_boundary(self, elements, p_tag, keq_tag, bound_faces=None):
         """
         input:
             elements: volumes ou meshset de volumes
@@ -138,28 +141,30 @@ class OtherUtils:
             dict com keys = elements e values = fluxo na face do contorno
         """
         dict_flux = {}
-        elements = utpy.get_elements(elements)
+        elements = utpy.get_elements(self.mb, elements)
         if bound_faces  == None:
             faces = utpy.get_boundary_of_volumes(self.mb, elements)
         else:
             faces = bound_faces
 
-        keqs = self.mb.tag_get_data(OtherUtils.list_tags[0], faces, flat=True)
-        elems = [self.mb.get_adjacencies(face) for face in faces]
-        s_gravs = self.mb.tag_get_data(OtherUtils.list_tags[1], faces, flat=True)
+        keqs = self.mb.tag_get_data(keq_tag, faces, flat=True)
+
+        s_gravs = self.mb.tag_get_data(self.list_tags[1], faces, flat=True)
         dict_keq = dict(zip(faces, keqs))
-        dict_elems = dict(zip(faces, elems))
         dict_s_grav = dict(zip(faces, s_gravs))
 
         for face in faces:
-            elems = dict_elems[face]
+            elems = self.mb.get_adjacencies(face, 3)
+            if len(elems) < 2:
+                continue
             keq = dict_keq[face]
             s_grav = dict_s_grav[face]
 
             p = self.mb.tag_get_data(p_tag, elems, flat=True)
-            flux = (p[1] - p[0])
+            flux = (p[1] - p[0])*keq
             if OtherUtils.gravity == True:
                 flux += s_grav
+
 
             if elems[0] in elements:
                 dict_flux[elems[0]] = flux
@@ -525,6 +530,47 @@ class OtherUtils:
         else:
             return T, np.zeros(n)
 
+    def fine_transmissibility_structured_bif(self, map_global, mobi_tag, faces_in=None):
+        """
+        """
+        # mtu = topo_util.MeshTopoUtil(mb)
+        s_grav_tag = self.mb.tag_get_handle(OtherUtils.name_s_grav)
+
+        elements = rng.Range(np.array(list(map_global.keys())))
+        n = len(elements)
+        all_s_gravs = []
+
+        if faces_in == None:
+            all_faces = utpy.get_faces(mb, rng.Range(elements))
+            # bound_faces = utpy.get_boundary_of_volumes(mb, elements)
+            # faces = rng.subtract(all_faces, bound_faces)
+            faces = rng.subtract(all_faces, utpy.get_boundary_of_volumes(mb, elements))
+        else:
+            faces = faces_in
+            all_faces = utpy.get_faces(mb, rng.Range(elements))
+
+        T = sp.lil_matrix((n, n))
+        s = np.zeros(n)
+
+        # cont = 0
+        for face in faces:
+            #1
+            keq, s_grav, elems = self.get_mobi_by_face_quad_bif(face, mobi_tag)
+            T[map_global[elems[0]], map_global[elems[1]]] = -keq
+            T[map_global[elems[1]], map_global[elems[0]]] = -keq
+            T[map_global[elems[0]], map_global[elems[0]]] += keq
+            T[map_global[elems[1]], map_global[elems[1]]] += keq
+            s[map_global[elems[0]]] += s_grav
+            s[map_global[elems[1]]] -= s_grav
+            all_s_gravs.append(s_grav)
+
+        self.mb.tag_set_data(s_grav_tag, faces, all_s_gravs)
+
+        if OtherUtils.gravity == True:
+            return T, s
+        else:
+            return T, np.zeros(n)
+
     @staticmethod
     def get_kequiv_by_face_quad(mb, mtu, face, perm_tag, area_tag):
         """
@@ -558,6 +604,91 @@ class OtherUtils:
         return keq, s_gr, elems
 
     @staticmethod
+    def get_sgrav_adjs_by_face(mb, mtu, face, keq):
+        elems = mb.get_adjacencies(face, 3)
+        centroid1 = mtu.get_average_position([elems[0]])
+        centroid2 = mtu.get_average_position([elems[1]])
+        z1 = OtherUtils.tz - centroid1[2]
+        z2 = OtherUtils.tz - centroid2[2]
+        s_gr = OtherUtils.gama*keq*(z1-z2)
+
+        return s_gr, elems
+
+
+    def get_mobi_by_face_quad_bif(self, face, mobi_tag):
+        """
+        retorna os valores de k equivalente para colocar na matriz
+        a partir da face
+
+        input:
+            face: face do elemento
+        output:
+            kequiv: k equivalente
+            elems: elementos vizinhos pela face
+            s: termo fonte da gravidade
+        """
+
+        elems = self.mb.get_adjacencies(face, 3)
+        mobi = self.mb.tag_get_data(mobi_tag, face, flat=True)[0]
+        centroid1 = self.mtu.get_average_position([elems[0]])
+        centroid2 = self.mtu.get_average_position([elems[1]])
+        direction = centroid2 - centroid1
+        z1 = OtherUtils.tz - centroid1[2]
+        z2 = OtherUtils.tz - centroid2[2]
+        s_gr = OtherUtils.gama*mobi*(z1-z2)
+
+        return mobi, s_gr, elems
+
+
+    def calculate_pcorr(self, elements, vertex_elem, pcorr_tag, pms_tag, keq_tag, faces, boundary_faces, volumes_d, volumes_n):
+        map_local = dict(zip(elems, range(len(elems))))
+
+        n = len(elems)
+        T = sp.lil_matrix((n, n))
+        b = np.zeros(n)
+
+        for i, face in enumerate(faces):
+            elems = self.mb.get_adjacencies(face, 3)
+            keq, s_grav, elems = self.get_mobi_by_face_quad_bif(face, keq_tag)
+            if face in boundary_faces:
+                p = self.mb.tag_get_data(pms_tag, elems, flat=True)
+                flux = (p[1] - p[0])*keq
+                if self.gravity == True:
+                    flux += s_grav
+
+                b[map_local[elems[0]]] += flux
+                b[map_local[elems[1]]] -= flux
+                continue
+
+            T[map_local[elems[0]], map_local[elems[1]]] = -keq
+            T[map_local[elems[1]], map_local[elems[0]]] = -keq
+            T[map_local[elems[0]], map_local[elems[0]]] += keq
+            T[map_local[elems[1]], map_local[elems[1]]] += keq
+
+        T[map_local[vertex], map_local[vertex]] = 1
+        p = self.mb.tag_get_data(pms_tag, vertex, flat=True)[0]
+        b[map_local[vertex]] = p
+
+        bound1 = rng.intersect(elems, volumes_d)
+        bound1 = rng.subtract(bound1, vertex)
+        if len(bound1) > 0:
+            ids = np.array([map_local[v] for v in bound1])
+            T[ids] = sp.lil_matrix((len(ids), n))
+            T[ids, ids] = np.ones(len(ids))
+            ps = self.mb.tag_get_data(pms_tag, bound1, flat=True)
+            b[ids] = ps
+
+        bound2 = rng.intersect(elems, volumes_n)
+        bound2 = rng.subtract(bound2, vertex)
+        if len(bound2) > 0:
+            ids = np.array([map_local[v] for v in bound2])
+            qs = self.mb.tag_get_data(self.list_tags[3], bound2, flat=True)
+            b[ids] += qs
+
+        x = linalg.spsolve(T, b)
+        self.mb.tag_set_data(pcorr_tag, elements, x)
+
+    @staticmethod
     def unitary(l):
         """
         obtem o vetor unitario positivo da direcao de l
@@ -578,3 +709,79 @@ class OtherUtils:
         keq = (2*k1*k2)/(k1+k2)
 
         return keq
+
+    @staticmethod
+    def lu_inv(M):
+        """
+        M = matriz do scipy
+        """
+
+        L=M.shape[0]
+        s=1000
+        if L<s:
+            tinv=time.time()
+            LU=linalg.splu(M)
+            inversa=csc_matrix(LU.solve(np.eye(M.shape[0])))
+            print(time.time()-tinv,M.shape[0],"tempo de inversão, ordem")
+        else:
+            div=1
+            for i in range(1,int(L/s)+1):
+                if L%i==0:
+                    div=i
+            l=int(L/div)
+            ident=np.eye(l)
+            zeros=np.zeros((l,l),dtype=int)
+            tinv=time.time()
+            LU=linalg.splu(M)
+            print(div,M.shape[0],"Num divisões, Tamanho")
+            for j in range(div):
+                for k in range(j):
+                    try:
+                        B=np.concatenate([B,zeros])
+                    except NameError:
+                        B=zeros
+                if j==0:
+                    B=ident
+                else:
+                    B=np.concatenate([B,ident])
+                for i in range(div-j-1):
+                    B=np.concatenate([B,zeros])
+                if j==0:
+                    inversa=csc_matrix(LU.solve(B))
+                    del(B)
+                else:
+                    inversa=csc_matrix(hstack([inversa,csc_matrix(LU.solve(B))]))
+                    del(B)
+            print(time.time()-tinv,M.shape[0],div,"tempo de inversão, ordem")
+        return inversa
+
+    @staticmethod
+    def get_op_by_wirebasket_Tf(Tf_wire, wirebasket_numbers):
+        matrices_tf = find(Tf_wire)
+        inds_tf = [matrices_tf[0], matrices_tf[1], matrices_tf[2], Tf_wire.shape]
+        del matrices_tf
+        inds_tf_mod = OtherUtils.get_tmod_by_inds(inds_tf, wirebasket_numbers)
+        Tf_mod = sp.lil_matrix(tuple(inds_tf_mod[3]))
+        Tf_mod[inds_tf_mod[0], inds_tf_mod[1]] = inds_tf_mod[2]
+        OP1_AMS = prol_tpfa.get_op_AMS_TPFA(Tf_mod, wirebasket_numbers).tocsc()
+
+        return OP1_AMS
+
+    @staticmethod
+    def get_op_by_wirebasket_Tf_wire_coarse(Tf_wire_coarse, wirebasket_numbers):
+        matrices_tf = find(Tf_wire_coarse)
+        inds_tf = [matrices_tf[0], matrices_tf[1], matrices_tf[2], Tf_wire_coarse.shape]
+        del matrices_tf
+        inds_tf_mod = OtherUtils.get_tc_tpfa(inds_tf, wirebasket_numbers)
+        inds_tf_mod = OtherUtils.get_tmod_by_inds(inds_tf_mod, wirebasket_numbers)
+        Tf_mod = sp.lil_matrix(tuple(inds_tf_mod[3]))
+        Tf_mod[inds_tf_mod[0], inds_tf_mod[1]] = inds_tf_mod[2]
+        OP2_AMS = prol_tpfa.get_op_AMS_TPFA(Tf_mod, wirebasket_numbers).tocsc()
+
+        return OP2_AMS
+
+    @staticmethod
+    def get_solution(T, b):
+        T = T.tocsc()
+        x = linalg.spsolve(T, b)
+        return x

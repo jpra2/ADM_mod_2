@@ -1,34 +1,60 @@
-input_file: '18x18x18'
+input_file: '27x27x27'
 
 gravity: False
+# adicionar o efeito da gravidade
 MPFA: False
-bifasico: False
+# estruturado ou nao
+bifasico: True
+# escoamento bifasico
+ADM: True
+# solucao multiescala ADM
 
 rs:
+  # Distancia ate o ponto onde se mantem malha fina
   r0: 1
+  # Distancia ate o ponto onde se mantem malha intermediaria
   r1: 1
 
+# Tamanho dos blocos nos seus respectivos niveis
 Ls:
   L1: [3,3,3]
   L2: [9,9,9]
 
+# Pocos para malhas estruturadas
 Wells_structured:
   P1:
     id: 'I1'
     type_region: 'box'
     region1: [0.0, 0.0, 0.0]
-    region2: [1.0, 1.0, 1.0]
+    region2: [1.0, 27.0, 27.0]
     type_prescription: 'neumann'
-    value: 10.0
+    value: 7290.0
     type_well: 'injector'
     type_fluid: Null
 
   P2:
     id: 'P1'
     type_region: 'box'
-    region1: [17.0, 17.0, 17.0]
-    region2: [18.0, 18.0, 18.0]
+    region1: [26.0, 0.0, 0.0]
+    region2: [27.0, 27.0, 27.0]
     type_prescription: 'dirichlet'
     value: 100.0
     type_well: 'producer'
     type_fluid: Null
+
+dados_bifasico:
+  Sor: 0.2
+  Swc: 0.2
+  mi_w: 1.0
+  mi_o: 1.0
+  gama_w: 10.0
+  gama_o: 0.9
+  nwater: 2.0
+  noil: 2.0
+  loops: 1000
+  total_time: 1000
+
+tempos_vpi_impressao: [0.25, 0.5, 0.75, 0.8, 0.9]
+contar_loop: True
+contar_tempo: True
+imprimir_sempre: True

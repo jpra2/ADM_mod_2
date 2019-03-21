@@ -111,9 +111,9 @@ def get_OP_adm_nv2(mb, all_volumes, wirebasket_ids_nv1, OP_AMS2, L1_ID_tag, L2_I
         col_op2 = OP_AMS2[:,nc2]
         indices = sp.find(col_op2)
         nc_vert_pi_chapeu_nv1 = mb.tag_get_data(primal_id_tag1, m, flat=True)[0]
-        print(indices)
-        print(nc_vert_pi_chapeu_nv1)
-        import pdb; pdb.set_trace()
+        # print(indices)
+        # print(nc_vert_pi_chapeu_nv1)
+        # import pdb; pdb.set_trace()
         lines = []
         vals = []
         for j, ind in enumerate(indices[0]):

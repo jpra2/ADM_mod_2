@@ -56,7 +56,9 @@ M1.mb.tag_set_data(M1.mpfa_tag, 0, mpfa)
 if bifasico == True:
     M1.create_tags_bif()
     wells_injector = M1.mb.create_meshset()
+    wells_producer = M1.mb.create_meshset()
     M1.mb.tag_set_data(M1.wells_injector_tag, 0, wells_injector)
+    M1.mb.tag_set_data(M1.wells_producer_tag, 0, wells_producer)
     M1.mb.tag_set_data(M1.sor_tag, 0, float(data_loaded['dados_bifasico']['Sor']))
     M1.mb.tag_set_data(M1.swc_tag, 0, float(data_loaded['dados_bifasico']['Swc']))
     M1.mb.tag_set_data(M1.mi_w_tag, 0, float(data_loaded['dados_bifasico']['mi_w']))
@@ -117,7 +119,7 @@ for well in data_loaded['Wells_structured']:
         else:
             z_elems_d = -1*np.array([M1.mtu.get_average_position([v])[2] for v in volumes])
             delta_z = z_elems_d + Lz
-            pressao = M1.gama*(delta_z) + press
+            pressao = M1.gama*(delta_z) + value
 
         M1.mb.tag_set_data(M1.press_value_tag, volumes, pressao)
 
@@ -130,8 +132,12 @@ for well in data_loaded['Wells_structured']:
     else:
         raise NameError("type_prescription == 'neumann' or 'dirichlet'")
 
-    if bifasico == True and w['type_well'] == 'injector':
-        M1.mb.add_entities(wells_injector, volumes)
+    if bifasico == True:
+        if w['type_well'] == 'injector':
+            M1.mb.add_entities(wells_injector, volumes)
+        else:
+            M1.mb.add_entities(wells_producer, volumes)
+
 
 
 
@@ -255,52 +261,52 @@ zmax = zmax_2
 # Essa grade é absoluta (relativa ao reservatório como um todo)
 lx2, ly2, lz2 = [], [], []
 # O valor 0.01 é adicionado para corrigir erros de ponto flutuante
-for i in range(int(Lx/lb[0]+1.01)):    lx2.append(xmin+i*lb[0])
-for i in range(int(Ly/lb[1]+1.01)):    ly2.append(ymin+i*lb[1])
-for i in range(int(Lz/lb[2]+1.01)):    lz2.append(zmin+i*lb[2])
+for i in range(int(Lx/l2+1.01)):    lx2.append(xmin+i*l2)
+for i in range(int(Ly/l2+1.01)):    ly2.append(ymin+i*l2)
+for i in range(int(Lz/l2+1.01)):    lz2.append(zmin+i*l2)
 
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-lxd2=[lx2[0]+la[0]/2]
+lxd2=[lx2[0]+l1/2]
 if len(lx2)>2:
     for i in np.linspace((lx2[1]+lx2[2])/2,(lx2[-2]+lx2[-3])/2,len(lx2)-3):
         lxd2.append(i)
-lxd2.append(lx2[-1]-la[0]/2)
+lxd2.append(lx2[-1]-l1/2)
 
-lyd2=[ly2[0]+la[1]/2]
+lyd2=[ly2[0]+l1/2]
 if len(ly2)>2:
     for i in np.linspace((ly2[1]+ly2[2])/2,(ly2[-2]+ly2[-3])/2,len(ly2)-3):
         lyd2.append(i)
-lyd2.append(ly2[-1]-la[1]/2)
+lyd2.append(ly2[-1]-l1/2)
 
-lzd2=[lz2[0]+la[2]/2]
+lzd2=[lz2[0]+l1/2]
 if len(lz2)>2:
     for i in np.linspace((lz2[1]+lz2[2])/2,(lz2[-2]+lz2[-3])/2,len(lz2)-3):
         lzd2.append(i)
-lzd2.append(lz2[-1]-la[2]/2)
+lzd2.append(lz2[-1]-l1/2)
 
 print("definiu planos do nível 2")
 
 # Vetor que define a "grade" que separa os volumes da malha fina
 # Essa grade é relativa a cada um dos blocos da malha grossa
 lx1, ly1, lz1 = [], [], []
-for i in range(int(lb[0]/la[0])):   lx1.append(i*la[0])
-for i in range(int(lb[1]/la[1])):   ly1.append(i*la[1])
-for i in range(int(lb[2]/la[2])):   lz1.append(i*la[2])
+for i in range(int(l2/l1)):   lx1.append(i*l1)
+for i in range(int(l2/l1)):   ly1.append(i*l1)
+for i in range(int(l2/l1)):   lz1.append(i*l1)
 
 lxd1=[xmin+dx0/100]
-for i in np.linspace(xmin+1.5*la[0],xmax-1.5*la[0],int((Lx-3*la[0])/la[0]+1.1)):
+for i in np.linspace(xmin+1.5*l1,xmax-1.5*l1,int((Lx-3*l1)/l1+1.1)):
     lxd1.append(i)
 lxd1.append(xmin+Lx-dx0/100)
 
 lyd1=[ymin+dy0/100]
-for i in np.linspace(ymin+1.5*la[1],ymax-1.5*la[1],int((Ly-3*la[1])/la[1]+1.1)):
+for i in np.linspace(ymin+1.5*l1,ymax-1.5*l1,int((Ly-3*l1)/l1+1.1)):
     lyd1.append(i)
 lyd1.append(ymin+Ly-dy0/100)
 
 lzd1=[zmin+dz0/100]
-for i in np.linspace(zmin+1.5*la[2],zmax-1.5*la[2],int((Lz-3*la[2])/la[2]+1.1)):
+for i in np.linspace(zmin+1.5*l1,zmax-1.5*l1,int((Lz-3*l1)/l1+1.1)):
     lzd1.append(i)
 lzd1.append(xmin+Lz-dz0/100)
 
@@ -379,23 +385,23 @@ for i in range(len(lx2)-1):
             all_volumes=M1.mb.get_entities_by_handle(AV_meshset)
             for elem in all_volumes:
                 centroid=M1.mtu.get_average_position([elem])
-                if (centroid[0]>lx2[i]) and (centroid[0]<ly2[i]+lb[1]) and (centroid[1]>ly2[j])\
-                and (centroid[1]<ly2[j]+lb[1]) and (centroid[2]>lz2[k]) and (centroid[2]<lz2[k]+lb[2]):
+                if (centroid[0]>lx2[i]) and (centroid[0]<ly2[i]+l2) and (centroid[1]>ly2[j])\
+                and (centroid[1]<ly2[j]+l2) and (centroid[2]>lz2[k]) and (centroid[2]<lz2[k]+l2):
                     M1.mb.add_entities(l2_meshset,[elem])
                     M1.mb.remove_entities(AV_meshset,[elem])
                     elem_por_L2=M1.mb.get_entities_by_handle(l2_meshset)
 
                 if i<(len(lxd2)-1) and j<(len(lyd2)-1) and k<(len(lzd2)-1):
-                    if (centroid[0]>lxd2[i]-la[0]/2) and (centroid[0]<lxd2[i+1]+la[0]/2) and (centroid[1]>lyd2[j]-la[1]/2)\
-                    and (centroid[1]<lyd2[j+1]+la[1]/2) and (centroid[2]>lzd2[k]-la[2]/2) and (centroid[2]<lzd2[k+1]+la[2]/2):
+                    if (centroid[0]>lxd2[i]-l1/2) and (centroid[0]<lxd2[i+1]+l1/2) and (centroid[1]>lyd2[j]-l1/2)\
+                    and (centroid[1]<lyd2[j+1]+l1/2) and (centroid[2]>lzd2[k]-l1/2) and (centroid[2]<lzd2[k+1]+l1/2):
 
                         M1.mb.add_entities(d2_meshset,[elem])
                         f1a2v3=0
-                        if (centroid[0]-lxd2[i])**2<la[0]**2/4 or (centroid[0]-lxd2[i+1])**2<la[0]**2/4 :
+                        if (centroid[0]-lxd2[i])**2<l1**2/4 or (centroid[0]-lxd2[i+1])**2<l1**2/4 :
                             f1a2v3+=1
-                        if (centroid[1]-lyd2[j])**2<la[1]**2/4 or (centroid[1]-lyd2[j+1])**2<la[1]**2/4:
+                        if (centroid[1]-lyd2[j])**2<l1**2/4 or (centroid[1]-lyd2[j+1])**2<l1**2/4:
                             f1a2v3+=1
-                        if (centroid[2]-lzd2[k])**2<la[2]**2/4 or (centroid[2]-lzd2[k+1])**2<la[2]**2/4:
+                        if (centroid[2]-lzd2[k])**2<l1**2/4 or (centroid[2]-lzd2[k+1])**2<l1**2/4:
                             f1a2v3+=1
                         M1.mb.tag_set_data(D2_tag, elem, f1a2v3)
                         M1.mb.tag_set_data(fine_to_primal2_classic_tag, elem, nc2)
@@ -414,19 +420,19 @@ for i in range(len(lx2)-1):
             nc2+=1
 
             for m in range(len(lx1)):
-                a=la[0]*i+m
+                a=l1*i+m
                 for n in range(len(ly1)):
-                    b=la[1]*j+n
+                    b=l1*j+n
                     for o in range(len(lz1)):
-                        c=la[2]*k+o
+                        c=l1*k+o
                         l1_meshset=M1.mb.create_meshset()
                         for e in elem_por_L2:
                             # Refactory here
                             # Verificar se o uso de um vértice reduz o custo
                             centroid=M1.mtu.get_average_position([e])
-                            if (centroid[0]>lx2[i]+lx1[m]) and (centroid[0]<lx2[i]+lx1[m]+la[0])\
-                            and (centroid[1]>ly2[j]+ly1[n]) and (centroid[1]<ly2[j]+ly1[n]+la[1])\
-                            and (centroid[2]>lz2[k]+lz1[o]) and (centroid[2]<lz2[k]+lz1[o]+la[2]):
+                            if (centroid[0]>lx2[i]+lx1[m]) and (centroid[0]<lx2[i]+lx1[m]+l1)\
+                            and (centroid[1]>ly2[j]+ly1[n]) and (centroid[1]<ly2[j]+ly1[n]+l1)\
+                            and (centroid[2]>lz2[k]+lz1[o]) and (centroid[2]<lz2[k]+lz1[o]+l1):
                                 M1.mb.add_entities(l1_meshset,[e])
                             if a<(len(lxd1)-1) and b<(len(lyd1)-1) and c<(len(lzd1)-1):
                                 if (centroid[0]>lxd1[a]-1.5*dx0) and (centroid[0]<lxd1[a+1]+1.5*dx0)\
@@ -534,12 +540,23 @@ l_ids=[0,nni,nnf,nne,nnv]
 for i, elems in enumerate(l_elems):
     M1.mb.tag_set_data(ID_reordenado_tag, elems, np.arange(l_ids[i],l_ids[i+1]))
 
+v=M1.mb.create_meshset()
+M1.mb.add_entities(v,vertices)
+tmod12=time.time()
+inte=M1.mb.get_entities_by_type_and_tag(v, types.MBHEX, np.array([D2_tag]), np.array([0]))
+fac=M1.mb.get_entities_by_type_and_tag(v, types.MBHEX, np.array([D2_tag]), np.array([1]))
+are=M1.mb.get_entities_by_type_and_tag(v, types.MBHEX, np.array([D2_tag]), np.array([2]))
+ver=M1.mb.get_entities_by_type_and_tag(v, types.MBHEX, np.array([D2_tag]), np.array([3]))
 
+M1.mb.tag_set_data(fine_to_primal2_classic_tag, ver, np.arange(len(ver)))
 
 for meshset in meshsets_nv2:
-    nc = M1.mb.tag_get_data(primal_id_tag2, meshset, flat=True)[0]
     elems = M1.mb.get_entities_by_handle(meshset)
+    vert = rng.intersect(elems, ver)
+    nc = M1.mb.tag_get_data(fine_to_primal2_classic_tag, vert, flat=True)[0]
     M1.mb.tag_set_data(fine_to_primal2_classic_tag, elems, np.repeat(nc, len(elems)))
+    M1.mb.tag_set_data(primal_id_tag2, meshset, nc)
+
 
 names_tags_criadas_aqui = ['d1', 'd2', 'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC',
                            'PRIMAL_ID_1', 'PRIMAL_ID_2', 'L2_MESHSET', 'FILE_NAME']

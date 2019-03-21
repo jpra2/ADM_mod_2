@@ -32,8 +32,8 @@ y2 = 26.0
 #box_volumes_d = np.array([np.array([0.0, 0.0, 0.0]), np.array([y1, y1, y1])])
 #box_volumes_n = np.array([np.array([y2, y2, y2]), np.array([y0, y0, y0])])
 tio=time.time()
-box_volumes_d = np.array([np.array([0.0, 0.0, 0.0]), np.array([y1, y0, y0])])
-box_volumes_n = np.array([np.array([y2, 0.0, 0.0]), np.array([y0, y0, y0])])
+box_volumes_d = np.array([np.array([0.0, 0.0, 0.0]), np.array([y1, y1, y0])])
+box_volumes_n = np.array([np.array([y2, y2, 0.0]), np.array([y0, y0, y0])])
 
 # volumes com pressao prescrita
 inds0 = np.where(all_centroids[:,0] > box_volumes_d[0,0])[0]
@@ -553,6 +553,15 @@ meshsets_nv1 = M1.mb.get_entities_by_type_and_tag(
 meshsets_nv2 = M1.mb.get_entities_by_type_and_tag(
         M1.root_set, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([None]))
 
+n_levels = 2
+name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
+all_meshsets = [meshsets_nv1, meshsets_nv2]
+for i in range(n_levels):
+    meshsets = all_meshsets[i]
+    tag_boundary = M1.mb.tag_get_handle(name_tag_faces_boundary_meshsets + str(i+2), 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
+    utpy.set_faces_in_boundary_by_meshsets(M1.mb, meshsets, tag_boundary)
+
+
 
 for meshset in meshsets_nv2:
     nc = M1.mb.tag_get_data(primal_id_tag2, meshset, flat=True)[0]
@@ -741,6 +750,40 @@ M1.mb.tag_set_data(erro1_tag, elems_wirebasket, erro)
 # M1.mb.tag_set_data(pf_tag, M1.all_volumes, Pf)
 M1.mb.tag_set_data(pms1_tag, elems_wirebasket, PMS_adm_nv1)
 
+p_tag = pms1_tag
+# gids_nv0 = M1.mb.tag_get_data(M1.ID_reordenado_tag, M1.all_volumes, flat=True)
+# map_global = dict(zip(M1.all_volumes, gids_nv0))
+# name_tag_faces_boundary_meshsets
+coarse_flux_nv2_tag = M1.mb.tag_get_handle('Q_nv2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+oth1 = oth(M1.mb, M1.mtu)
+tag_faces_bound_nv1 = M1.mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(2))
+all_faces_boundary_nv2 = M1.mb.tag_get_data(tag_faces_bound_nv1, 0, flat=True)[0]
+all_faces_boundary_nv2 = M1.mb.get_entities_by_handle(all_faces_boundary_nv2)
+# M1.mb.tag_set_data(M1.keq_tag, M1.all_faces, np.repeat(1.0, len(M1.all_faces)))
+# M1.mb.tag_set_data(M1.s_grav_tag, M1.all_faces, np.repeat(0.0, len(M1.all_faces)))
+for m in meshsets_nv1:
+    qtot = 0.0
+    elems = M1.mb.get_entities_by_handle(m)
+    # gids_nv1_adm = np.unique(M1.mb.tag_get_data(L1_ID_tag, elems, flat=True))
+    # if len(gids_nv1_adm) > 1:
+    #     continue
+    faces = M1.mtu.get_bridge_adjacencies(elems, 3, 2)
+    faces = rng.subtract(faces, M1.all_boundary_faces)
+    for face in faces:
+        keq, s_grav, elems2 = oth.get_kequiv_by_face_quad(M1.mb, M1.mtu, face, M1.perm_tag, M1.area_tag)
+        if elems2[0] in elems and elems2[1] in elems:
+            continue
+        p = M1.mb.tag_get_data(p_tag, elems2, flat=True)
+        flux = (p[1] - p[0])*keq
+        if elems2[0] in elems:
+            qtot += flux
+        else:
+            qtot -= flux
+    # b_faces = rng.intersect(faces, all_faces_boundary_nv2)
+    # dict_flux = oth1.get_flow_on_boundary(elems, p_tag, M1.keq_tag, bound_faces=b_faces)
+    # res = sum(dict_flux.values())
+    M1.mb.tag_set_data(coarse_flux_nv2_tag, elems, np.repeat(qtot, len(elems)))
+
 
 
 #### nivel 2
@@ -763,19 +806,20 @@ TC1_mod[inds_TC1_mod[0], inds_TC1_mod[1]] = inds_TC1_mod[2]
 
 t0=time.time()
 OP_ams_nv2 = prol1.get_op_AMS_TPFA(TC1_mod, wirebasket_numbers_nv1)
-OP_ams_nv2 = G_nv1.transpose(copy=True).dot(OP_ams_nv2)
+# OP_ams_nv2 = G_nv1.transpose(copy=True).dot(OP_ams_nv2)
+OP_ams_nv2 = G_nv1.dot(OP_ams_nv2)
 t2 = time.time()
 print('tempo op2')
 print(t2-t0)
 print('\n')
 
-print(elems_wirebasket_nv1_sep[3])
-for i in range(OP_ams_nv2.shape[1]):
-    indices = find(OP_ams_nv2[:,i])
-    ind = np.where(indices[2] == 1.0)[0]
-    print(indices[0][ind])
-    print('\n')
-    import pdb; pdb.set_trace()
+# print(elems_wirebasket_nv1_sep[3])
+# for i in range(OP_ams_nv2.shape[1]):
+#     indices = find(OP_ams_nv2[:,i])
+#     ind = np.where(indices[2] == 1.0)[0]
+#     print(indices[0][ind])
+#     print('\n')
+#     import pdb; pdb.set_trace()
 
 
 
@@ -793,31 +837,41 @@ print('tempo op_adm 2')
 print(t2-t0)
 print('\n')
 
+
+t0=time.time()
+OR_adm_nv2 = restm.get_OR_adm_nv2(M1.mb, M1.all_volumes, get_tag('l1_ID'), get_tag('l2_ID'), get_tag('l3_ID'), 3, get_tag('FINE_TO_PRIMAL1_CLASSIC'), get_tag('FINE_TO_PRIMAL2_CLASSIC'), get_tag('PRIMAL_ID_1'), get_tag('PRIMAL_ID_2'))
+print('tempo or adm2')
+print(t2-t0)
+print('\n')
 import pdb; pdb.set_trace()
 
-# t0=time.time()
-# OR_adm_nv2 = restm.get_OR_adm_nv2()
-# print('tempo or adm2')
-# print(t2-t0)
-# print('\n')
+T_adm_nv2_sol = OR_adm_nv2.dot(T_adm_nv1_sol)
+T_adm_nv2_sol = T_adm_nv2_sol.dot(OP_adm_nv2)
+b_adm_nv2 = OR_adm_nv2.dot(b_adm_nv1)
+PC_adm_nv2 = linalg.spsolve(T_adm_nv2_sol.tocsc(), b_adm_nv2)
+PMS_adm_nv2 = OP_adm_nv2.dot(PC_adm_nv2)
+PMS_adm_nv2 = OP_adm_nv1.dot(PMS_adm_nv2)
 
-
-
-
+ids_adm_lv2_n = M1.mb.tag_get_data(L2_ID_tag, volumes_n, flat=True)
+print(b_adm_nv2[ids_adm_lv2_n])
+ids_adm_lv1_n = M1.mb.tag_get_data(L1_ID_tag, volumes_n, flat=True)
+print(b_adm_nv1[ids_adm_lv1_n])
 
 import pdb; pdb.set_trace()
-import pdb; pdb.set_trace()
 
+erro2_tag = M1.mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+pms2_tag = M1.mb.tag_get_handle('PMS2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+erro = 100*np.absolute((Pf - PMS_adm_nv2)/Pf)
+M1.mb.tag_set_data(erro2_tag, elems_wirebasket, erro)
+# M1.mb.tag_set_data(pf_tag, M1.all_volumes, Pf)
+M1.mb.tag_set_data(pms2_tag, elems_wirebasket, PMS_adm_nv2)
 
+print('writting h5m file')
+M1.mb.write_file('solucao1.h5m')
 
-
-
-# print('writting h5m file')
-# M1.mb.write_file('solucao1.h5m')
+av=M1.mb.create_meshset()
+M1.mb.add_entities(av, M1.all_volumes)
+print('writting vtk file')
+M1.mb.write_file('solucao1.vtk',[av])
 #
-# av=M1.mb.create_meshset()
-# M1.mb.add_entities(av, M1.all_volumes)
-# print('writting vtk file')
-# M1.mb.write_file('solucao1.vtk',[av])
-# #
-# print('end')
+print('end')

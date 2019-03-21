@@ -4,7 +4,6 @@ from pymoab import core, types, rng, topo_util
 import time
 import os
 import scipy
-import cython
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
 import yaml
 
@@ -27,49 +26,20 @@ with open("inputs.yaml", 'r') as stream:
     data_loaded = yaml.load(stream)
 
 input_file = data_loaded['input_file']
-ext_h5m = input_file + '.h5m'
+ext_h5m_adm = input_file + '_malha_adm.h5m'
 
 mb = core.Core()
 root_set = mb.get_root_set()
 mtu = topo_util.MeshTopoUtil(mb)
 os.chdir(flying_dir)
-mb.load_file(ext_h5m)
+mb.load_file(ext_h5m_adm)
+list_names_tags = np.load('list_names_tags.npy')
 os.chdir(parent_dir)
 
-#--------------Início dos parâmetros de entrada-------------------
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
-list_names_tags = ['PERM', 'PHI', 'CENT', 'finos', 'P', 'Q', 'FACES_BOUNDARY', 'AREA',
-                   'G_ID_tag', 'ID_reord_tag', 'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC',
-                   'PRIMAL_ID_1', 'PRIMAL_ID_2', 'd1', 'd2', 'K_EQ', 'S_GRAV', 'L2_MESHSET',
-                   'intermediarios', 'R0', 'R1']
-tags_1 = utpy.get_all_tags_1(mb, list_names_tags)
-dict_tags = dict(zip(list_names_tags, tags_1))
 
-def get_tag(name):
-    global list_names_tags
-    global tags_1
-    index = list_names_tags.index(name)
-    return tags_1[index]
-
-n_levels = len(np.unique(mb.tag_get_data(L3_ID_tag, all_volumes, flat=True))) - 1
+dict_tags = utpy.get_all_tags_2(mb, list_names_tags)
 name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
-
-for i in range(n_levels):
-    name = name_tag_faces_boundary_meshsets + str(i+2)
-    tag = mb.tag_get_handle(name)
-    list_names_tags.append(name)
-    tags_1.append(tag)
-    dict_tags[name] = tag
-
-# Distância, em relação ao poço, até onde se usa malha fina
-r0 = mb.tag_get_data(dict_tags['R0'], 0, flat=True)[0]
-
-# Distância, em relação ao poço, até onde se usa malha intermediária
-r1 = mb.tag_get_data(dict_tags['R1'], 0, flat=True)[0]
-#--------------fim dos parâmetros de entrada------------------------------------
-
-print('INICIOU PROCESSAMENTO')
-print('\n')
 
 def lu_inv(M):
     L=M.shape[0]
@@ -111,161 +81,40 @@ def lu_inv(M):
         print(time.time()-tinv,M.shape[0],div,"tempo de inversão, ordem")
     return inversa
 
-# --------------Atribuição dos IDs de cada nível em cada volume-----------------
-# Esse bloco é executado uma vez a cada iteração em um problema bifásico,
-# sua eficiência é criticamente importante.
-intermediarios = mb.get_entities_by_handle(mb.tag_get_data(get_tag('intermediarios'), 0, flat=True)[0])
-##########################################################################################
-L1_ID_tag=mb.tag_get_handle("l1_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
-L2_ID_tag=mb.tag_get_handle("l2_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
-L3_ID_tag=mb.tag_get_handle("l3_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
-list_names_tags.append('l1_ID')
-list_names_tags.append('l2_ID')
-list_names_tags.append('l3_ID')
-tags_1.append(L1_ID_tag)
-tags_1.append(L2_ID_tag)
-tags_1.append(L3_ID_tag)
-dict_tags['l1_ID'] = L1_ID_tag
-dict_tags['l2_ID'] = L2_ID_tag
-dict_tags['l3_ID'] = L3_ID_tag
-##########################################################################################
+tempo0_ADM = time.time()
 
-#############################################
+primal_id_tag1 = dict_tags['PRIMAL_ID_1']
+primal_id_tag2 = dict_tags['PRIMAL_ID_2']
+fine_to_primal2_classic_tag = dict_tags['FINE_TO_PRIMAL2_CLASSIC']
+fine_to_primal1_classic_tag = dict_tags['FINE_TO_PRIMAL1_CLASSIC']
+D1_tag = dict_tags['d1']
 
-L2_meshset = mb.tag_get_data(get_tag('L2_MESHSET'), 0, flat=True)[0]
-finos = mb.tag_get_data(get_tag('finos'), 0, flat=True)
-finos = list(mb.get_entities_by_handle(finos))
-
-######################################################################
-# ni = ID do elemento no nível i
-n1=0
-n2=0
-aux=0
-meshset_by_L2 = mb.get_child_meshsets(L2_meshset)
-print("  ")
-print("INICIOU SOLUÇÃO ADM")
-tempo0_ADM=time.time()
-t0 = tempo0_ADM
-for m2 in meshset_by_L2:
-    tem_poço_no_vizinho=False
-    meshset_by_L1= mb.get_child_meshsets(m2)
-    for m1 in meshset_by_L1:
-        elem_by_L1 = mb.get_entities_by_handle(m1)
-        for elem1 in elem_by_L1:
-            if elem1 in finos:
-                aux=1
-                tem_poço_no_vizinho=True
-            if elem1 in intermediarios:
-                tem_poço_no_vizinho=True
-        if aux==1:
-            aux=0
-            for elem in elem_by_L1:
-                n1+=1
-                n2+=1
-
-                mb.tag_set_data(L1_ID_tag, elem, n1)
-                mb.tag_set_data(L2_ID_tag, elem, n2)
-                mb.tag_set_data(L3_ID_tag, elem, 1)
-                elem_tags = mb.tag_get_tags_on_entity(elem)
-                elem_Global_ID = mb.tag_get_data(elem_tags[0], elem, flat=True)
-                finos.append(elem)
-
-    if tem_poço_no_vizinho:
-        for m1 in meshset_by_L1:
-            elem_by_L1 = mb.get_entities_by_handle(m1)
-            n1+=1
-            n2+=1
-            t=1
-            for elem in elem_by_L1:
-                if elem not in finos:
-                    mb.tag_set_data(L1_ID_tag, elem, n1)
-                    mb.tag_set_data(L2_ID_tag, elem, n2)
-                    mb.tag_set_data(L3_ID_tag, elem, 2)
-                    t=0
-            n1-=t
-            n2-=t
-    else:
-        n2+=1
-        for m1 in meshset_by_L1:
-            elem_by_L1 = mb.get_entities_by_handle(m1)
-            n1+=1
-            for elem2 in elem_by_L1:
-                elem2_tags = mb.tag_get_tags_on_entity(elem)
-                mb.tag_set_data(L2_ID_tag, elem2, n2)
-                mb.tag_set_data(L1_ID_tag, elem2, n1)
-                mb.tag_set_data(L3_ID_tag, elem2, 3)
-
-# ------------------------------------------------------------------------------
-print('Definição da malha ADM: ',time.time()-t0)
-t0=time.time()
-
-av=mb.create_meshset()
-# for v in all_volumes:
-#     mb.add_entities(av,[v])
-
-mb.add_entities(av, all_volumes)
-
-# fazendo os ids comecarem de 0 em todos os niveis
-tags = [L1_ID_tag, L2_ID_tag]
-for tag in tags:
-    all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
-    minim = min(all_gids)
-    all_gids -= minim
-    mb.tag_set_data(tag, all_volumes, all_gids)
-
-os.chdir(flying_dir)
-ext_h5m_adm = input_file + '_malha_adm.h5m'
-mb.write_file(ext_h5m_adm)
-np.save('list_names_tags',np.array(list_names_tags))
-os.chdir(parent_dir)
-##########################################################
-
-
-#####################################################
-#################################
-# #Aqui comeca o calculo do metodo adm
-#################################
-######################################################
-
-primal_id_tag1 = get_tag('PRIMAL_ID_1')
-primal_id_tag2 = get_tag('PRIMAL_ID_2')
-fine_to_primal2_classic_tag = get_tag('FINE_TO_PRIMAL2_CLASSIC')
-fine_to_primal1_classic_tag = get_tag('FINE_TO_PRIMAL1_CLASSIC')
-
-# volumes da malha grossa primal 1
-# meshsets_nv1 = mb.get_entities_by_type_and_tag(
-#         0, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
-
-# volumes da malha grossa primal 2
-
-tmod1=time.time()
-
-D1_tag = get_tag('d1')
+meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
+meshsets_nv2 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([None]))
+n1 = len(meshsets_nv1)
+n2 = len(meshsets_nv2)
 
 internos=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([0]))
 faces=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([1]))
 arestas=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([2]))
 vertices=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([3]))
 
-# print(time.time()-tmod1,"mod1 ______")
-
 ni=len(internos)
 nf=len(faces)
 na=len(arestas)
 nv=len(vertices)
-tmod2=time.time()
-
-ID_reordenado_tag = get_tag('ID_reord_tag')
 
 nni=ni
 nnf=nni+nf
 nne=nnf+na
 nnv=nne+nv
-l_elems=[internos,faces,arestas,vertices]
-l_ids=[0,nni,nnf,nne,nnv]
-for i, elems in enumerate(l_elems):
-    mb.tag_set_data(ID_reordenado_tag, elems, np.arange(l_ids[i],l_ids[i+1]))
-print(time.time()-tmod2,"tmod2 ________________")
+
+volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['P']]), np.array([None]))
+volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['Q']]), np.array([None]))
+
+
+tmod1=time.time()
+ID_reordenado_tag = dict_tags['ID_reord_tag']
 
 lii=[]
 lif=[]
@@ -292,10 +141,10 @@ dev=[]
 # k_eq_tag = tags_1[index]
 # index = list_names_tags.index('S_GRAV')
 # s_grav_tag = tags_1[index]
-area_tag = get_tag('AREA')
-perm_tag = get_tag('PERM')
+area_tag = dict_tags['AREA']
+perm_tag = dict_tags['PERM']
 
-boundary_faces = mb.get_entities_by_handle(mb.tag_get_data(get_tag('FACES_BOUNDARY'), 0, flat=True)[0])
+boundary_faces = mb.get_entities_by_handle(mb.tag_get_data(dict_tags['FACES_BOUNDARY'], 0, flat=True)[0])
 
 gids2 = mb.tag_get_data(ID_reordenado_tag, all_volumes, flat=True)
 map_global = dict(zip(all_volumes, gids2))
@@ -451,7 +300,7 @@ print("took to get_OP_AMS",time.time()-ty)
 AMS_TO_ADM={}
 i=0
 for v in vertices:
-    ID_ADM=int(mb.tag_get_data(L1_ID_tag,v))
+    ID_ADM=int(mb.tag_get_data(dict_tags['l1_ID'],v))
     AMS_TO_ADM[str(i)] = ID_ADM
     i+=1
 
@@ -486,9 +335,9 @@ print("organize OP_ADM")
 P=csc_matrix(P)
 ty=time.time()
 print("iniciou____")
-nivel_1 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
+nivel_1 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array([1]))
 print("get nivel 1___")
-
+t0 = time.time()
 matriz=scipy.sparse.find(P)
 LIN=matriz[0]
 COL=matriz[1]
@@ -496,7 +345,7 @@ DAT=matriz[2]
 del(matriz)
 
 for v in nivel_1:
-    ID_ADM=int(mb.tag_get_data(L1_ID_tag,v))
+    ID_ADM=int(mb.tag_get_data(dict_tags['l1_ID'],v))
     ID_global=int(mb.tag_get_data(ID_reordenado_tag,v))
     lines.append(ID_global)
     cols.append(ID_ADM)
@@ -526,8 +375,11 @@ del(ID_ADM)
 #    data.append(DAT[k])
 ###############
 
+gids_nv1_adm = np.unique(mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True))
+n1_adm = len(gids_nv1_adm)
+
 print("op_adm", time.time()-ty)
-OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1))
+OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
 
 print("took",time.time()-t0)
 print("Obtendo OP_ADM_2")
@@ -539,12 +391,12 @@ cols=[]
 data=[]
 for v in all_volumes:
      elem_Global_ID = int(mb.tag_get_data(ID_reordenado_tag, v, flat=True))
-     elem_ID1 = int(mb.tag_get_data(L1_ID_tag, v, flat=True))
+     elem_ID1 = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
      lines.append(elem_ID1)
      cols.append(elem_Global_ID)
      data.append(1)
      #OR_ADM[elem_ID1][elem_Global_ID]=1
-OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1,len(all_volumes)))
+OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1_adm,len(all_volumes)))
 
 print(time.time()-tmod3,"Tmod3 _________")
 
@@ -654,7 +506,7 @@ T_ADM=OR_ADM*T*OP_ADM
 #del(fac)
 #del(are)
 #del(ver)
-D2_tag = get_tag('d2')
+D2_tag = dict_tags['d2']
 v=mb.create_meshset()
 mb.add_entities(v,vertices)
 tmod12=time.time()
@@ -707,9 +559,12 @@ for i in range(nver):
 
 G=csc_matrix((data,(lines,cols)),shape=(nv,nv))
 
+
 W_AMS=G*T_AMS*(G.transpose())
 
-MPFA_NO_NIVEL_2=data_loaded['MPFA']
+MPFA_NO_NIVEL_2=mb.tag_get_data(dict_tags['MPFA'], 0, flat=True)[0]
+
+
 #-------------------------------------------------------------------------------
 ni=nint
 nf=nfac
@@ -795,12 +650,15 @@ COL_TO_ADM_2={}
 # ver é o meshset dos vértices da malha dual grossa
 for v in ver:
     ID_AMS=int(mb.tag_get_data(fine_to_primal2_classic_tag,v))
-    ID_ADM=int(mb.tag_get_data(L2_ID_tag,v))
+    ID_ADM=int(mb.tag_get_data(dict_tags['l2_ID'],v))
     COL_TO_ADM_2[str(ID_AMS)] = ID_ADM
 P2=P2.toarray()
 #---Vértices é o meshset dos véttices da malha dual do nivel intermediário------
 
 #OP_ADM_2=np.zeros((len(T_ADM),n2))
+
+gids_adm_nv2 = np.unique(mb.tag_get_data(dict_tags['l2_ID'], all_volumes, flat=True))
+n2_adm = len(gids_adm_nv2)
 
 lines=[]
 cols=[]
@@ -810,11 +668,11 @@ print("Resolvendo sistema ADM_2")
 t0=time.time()
 My_IDs_2=[]
 for v in all_volumes:
-    ID_global=int(mb.tag_get_data(L1_ID_tag,v))
+    ID_global=int(mb.tag_get_data(dict_tags['l1_ID'],v))
     if ID_global not in My_IDs_2:
         My_IDs_2.append(ID_global)
-        ID_ADM=int(mb.tag_get_data(L2_ID_tag,v))
-        nivel=mb.tag_get_data(L3_ID_tag,v)
+        ID_ADM=int(mb.tag_get_data(dict_tags['l2_ID'],v))
+        nivel=mb.tag_get_data(dict_tags['l3_ID'],v)
         d1=mb.tag_get_data(D2_tag,v)
         ID_AMS = int(mb.tag_get_data(fine_to_primal2_classic_tag, v))
         # nivel<3 refere-se aos volumes na malha fina (nivel=1) e intermédiária (nivel=2)
@@ -833,21 +691,22 @@ for v in all_volumes:
                     cols.append(id_ADM)
                     data.append(float(p))
                     #OP_ADM_2[ID_global][id_ADM]=p
-OP_ADM_2=csc_matrix((data,(lines,cols)),shape=(n1,n2))
+OP_ADM_2=csc_matrix((data,(lines,cols)),shape=(n1_adm,n2_adm))
 
 #OR_ADM_2=np.zeros((n2,len(T_ADM)),dtype=np.int)
 lines=[]
 cols=[]
 data=[]
 for v in all_volumes:
-    elem_ID2 = int(mb.tag_get_data(L2_ID_tag, v, flat=True))
-    elem_Global_ID = int(mb.tag_get_data(L1_ID_tag, v, flat=True))
+    elem_ID2 = int(mb.tag_get_data(dict_tags['l2_ID'], v, flat=True))
+    elem_Global_ID = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
     lines.append(elem_ID2)
     cols.append(elem_Global_ID)
     data.append(1)
     #OR_ADM_2[elem_ID2][elem_Global_ID]=1
-OR_ADM_2=csc_matrix((data,(lines,cols)),shape=(n2,n1))
+OR_ADM_2=csc_matrix((data,(lines,cols)),shape=(n2_adm,n1_adm))
 T_ADM_2=OR_ADM_2*T_ADM*OP_ADM_2
+
 
 #-------------------------------------------------------------------------------
 # Insere condições de dirichlet nas matrizes
@@ -878,8 +737,8 @@ T_ADM_2=OR_ADM_2*T_ADM*OP_ADM_2
 ###
 ###print(time.time()-tmod,"modificação ____")
 
-press_tag = get_tag('P')
-vaz_tag = get_tag('Q')
+press_tag = dict_tags['P']
+vaz_tag = dict_tags['Q']
 
 volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([press_tag]), np.array([None]))
 volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([vaz_tag]), np.array([None]))
@@ -887,7 +746,7 @@ volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([vaz_tag]),
 tmod = time.time()
 ID_global = mb.tag_get_data(ID_reordenado_tag, volumes_d, flat=True)
 #ID_ADM=int(M1.mb.tag_get_data(L1_ID_tag,v))
-ID_ADM_2 = mb.tag_get_data(L2_ID_tag, volumes_d, flat=True)
+ID_ADM_2 = mb.tag_get_data(dict_tags['l2_ID'], volumes_d, flat=True)
 T[ID_global] = scipy.sparse.csc_matrix((len(ID_global),T.shape[0]))
 T[ID_global,ID_global] = np.ones(len(ID_global))
 
@@ -957,7 +816,8 @@ for v in all_volumes:
     mb.tag_set_data(Sol_TPFA_tag,v,SOL_TPFA[gid])
     mb.tag_set_data(Sol_ADM_tag,v,SOL_ADM_fina[gid])
 
-
+av = mb.create_meshset()
+mb.add_entities(av, all_volumes)
 os.chdir(output_dir)
 mb.write_file('teste_3D_unstructured_18.vtk',[av])
 print('New file created')

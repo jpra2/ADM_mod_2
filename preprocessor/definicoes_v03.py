@@ -255,9 +255,13 @@ zmax = zmax_2
 # Essa grade é absoluta (relativa ao reservatório como um todo)
 lx2, ly2, lz2 = [], [], []
 # O valor 0.01 é adicionado para corrigir erros de ponto flutuante
-for i in range(int(Lx/lb[0]+1.01)):    lx2.append(xmin+i*lb[0])
-for i in range(int(Ly/lb[1]+1.01)):    ly2.append(ymin+i*lb[1])
-for i in range(int(Lz/lb[2]+1.01)):    lz2.append(zmin+i*lb[2])
+for i in range(int(Lx/lb[0])):    lx2.append(xmin+i*lb[0])
+for i in range(int(Ly/lb[1])):    ly2.append(ymin+i*lb[1])
+for i in range(int(Lz/lb[2])):    lz2.append(zmin+i*lb[2])
+
+lx2.append(Lx)
+ly2.append(Ly)
+lz2.append(Lz)
 
 #-------------------------------------------------------------------------------
 
@@ -463,6 +467,9 @@ M1.mb.tag_set_data(l2_meshset_tag, 0, L2_meshset)
 print('Criação da árvore: ',time.time()-t0)
 ta=time.time()
 all_volumes=M1.all_volumes
+
+M1.mb.write_file('testando1.vtk')
+import pdb; pdb.set_trace()
 
 # vert_meshset=M1.mb.create_meshset()
 #
