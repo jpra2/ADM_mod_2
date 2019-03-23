@@ -74,7 +74,7 @@ class bifasico:
         self.gama = self.gama_w + self.gama_o
         self.fimin = mb.tag_get_data(self.phi_tag, all_volumes, flat=True).min()
         self.Vmin = mb.tag_get_data(self.volume_tag, all_volumes, flat=True).min()
-        historico = np.array(['vpi', 'tempo', 'prod_agua', 'prod_oleo', 'wor'])
+        historico = np.array(['vpi', 'tempo', 'prod_agua', 'prod_oleo', 'wor', 'dt'])
         np.save('historico', historico)
         self.V_total = mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
         self.V_total = float((self.V_total*mb.tag_get_data(self.phi_tag, all_volumes, flat=True)).sum())
@@ -606,7 +606,7 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def get_hist_ms(self, t):
+    def get_hist_ms(self, t, dt):
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
 
@@ -614,7 +614,7 @@ class bifasico:
         qo = (flux_total_prod.sum()- qw)*self.delta_t
         wor = qw/float(qo)
 
-        hist = np.array([self.vpi, t, qw, qo, wor])
+        hist = np.array([self.vpi, t, qw, qo, wor, dt])
         historico = np.load('historico.npy')
         historico = np.append(historico, hist)
         np.save('historico', historico)

@@ -579,6 +579,24 @@ class sol_adm_bifasico:
 
         return AMS_TO_ADM, COL_TO_ADM_2, G_nv1, OR1_AMS, OR2_AMS
 
+    def get_AMS_TO_ADM_dict2(self, mb, dict_tags):
+        AMS_TO_ADM={}
+        for v in self.vertices:
+            ID_ADM=int(mb.tag_get_data(dict_tags['l1_ID'],v))
+            ID_AMS=int(mb.tag_get_data(dict_tags['FINE_TO_PRIMAL1_CLASSIC'],v))
+            AMS_TO_ADM[str(ID_AMS)] = ID_ADM
+
+        COL_TO_ADM_2={}
+        # ver é o meshset dos vértices da malha dual grossa
+        for i in range(self.nver):
+            v = self.ver[i]
+            ID_AMS = int(mb.tag_get_data(dict_tags['FINE_TO_PRIMAL2_CLASSIC'],v))
+            ID_ADM = int(mb.tag_get_data(dict_tags['l2_ID'],v))
+            COL_TO_ADM_2[str(i)] = ID_ADM
+
+        self.AMS_TO_ADM = AMS_TO_ADM
+        self.COL_TO_ADM_2 = COL_TO_ADM_2
+
     def organize_OP1_ADM(self, mb, OP1_AMS, all_volumes, dict_tags):
 
         AMS_TO_ADM = self.AMS_TO_ADM

@@ -30,19 +30,14 @@ OR1_ADM = sp.load_npz('OR1_ADM.npz')
 OP2_ADM = sp.load_npz('OP2_ADM.npz')
 OR2_ADM = sp.load_npz('OR2_ADM.npz')
 b = np.load('b.npy')
+ids_volumes_d = np.load('ids_volumes_d.npy')
+values_d = np.load('values_d.npy')
 # sol = get_solution(Tf2, b)
+os.chdir(parent_dir)
 
-import pdb; pdb.set_trace()
 T1_ADM = OR1_ADM.dot(Tf2)
 T1_ADM = T1_ADM.dot(OP1_ADM)
 b1_ADM = OR1_ADM.dot(b)
-# for i in range(OP1_ADM.shape[0]):
-#     print(OP1_ADM[i])
-#     print(b1_ADM[i])
-#     print(T1_ADM[i])
-#     print(T1_ADM[i].sum())
-#     print('\n')
-#     import pdb; pdb.set_trace()
 T1_ADM = T1_ADM.tocsc()
 # PC1_ADM = get_solution(T1_ADM, b1_ADM)
 
@@ -64,7 +59,7 @@ T2_ADM = T2_ADM.tocsc()
 #         import pdb; pdb.set_trace()
 #         cont = 0
 # import pdb; pdb.set_trace()
-
+"""
 cont = 0
 mat = OR1_AMS
 for i in range(mat.shape[0]):
@@ -74,3 +69,4 @@ for i in range(mat.shape[0]):
         import pdb; pdb.set_trace()
         cont = 0
     cont += 1
+"""

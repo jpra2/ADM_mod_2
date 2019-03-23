@@ -23,7 +23,6 @@ out_bif_dir = os.path.join(output_dir, 'bifasico')
 out_bif_soldir_dir =  os.path.join(out_bif_dir, 'sol_direta')
 out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
 
-
 import importlib.machinery
 loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
 utpy = loader.load_module('pymoab_utils')
@@ -75,6 +74,8 @@ tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB
 tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
 def run_PMS(n1_adm, n2_adm, loop):
+    if loop > 0:
+        Pms2_ant = mb.tag_get_data(tags_1['PMS2'], sol_adm.wirebasket_elems, flat=True)
 
 
     As, s_grav = sol_adm.get_AS_structured(mb, tags_1, faces_in, all_volumes, bif_utils.mobi_in_faces_tag, map_global)
@@ -91,6 +92,8 @@ def run_PMS(n1_adm, n2_adm, loop):
     # OP1_AMS = sol_adm.get_OP1_AMS_structured(As)
 
     OP1_ADM, OR1_ADM = sol_adm.organize_OP1_ADM(mb, OP1_AMS, all_volumes, tags_1)
+    if loop > 2:
+        import pdb; pdb.set_trace()
     # sp.save_npz('OP1_AMS', OP1_AMS)
     # sp.save_npz('OP1_ADM', OP1_ADM)
     # sp.save_npz('OR1_ADM', OR1_ADM)
@@ -117,8 +120,6 @@ def run_PMS(n1_adm, n2_adm, loop):
     Tf2 = Tf2.tolil()
     Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
     b = oth.set_boundary_neumann(map_global, map_values_n, b)
-    sp.save_npz('Tf2' ,Tf2)
-    np.save('b', b)
 
     T1_ADM = OR1_ADM.dot(Tf2)
     T1_ADM = T1_ADM.dot(OP1_ADM)
@@ -193,6 +194,7 @@ def run_3(loop):
     bif_utils.set_lamb(all_volumes)
     bif_utils.set_mobi_faces(all_volumes, faces_in)
     adm_mesh.generate_adm_mesh(mb, all_volumes, loop=loop)
+    sol_adm.get_AMS_TO_ADM_dict2(mb, tags_1)
 
 def run(t, loop):
     n1_adm = len(np.unique(mb.tag_get_data(tags_1['l1_ID'], all_volumes, flat=True)))
@@ -241,7 +243,7 @@ if ADM == True:
         t1 = time.time()
         dt = t1-t0
 
-        bif_utils.get_hist_ms(t)
+        bif_utils.get_hist_ms(t, dt)
         ext_h5m = input_file + 'sol_multiescala_' + str(loop) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop) + '.vtk'
 
@@ -266,6 +268,7 @@ if ADM == True:
 
         testando = 'teste_' + str(loop) + '.vtk'
         mb.write_file(testando, [vv])
+
 
 
 
@@ -304,7 +307,7 @@ else:
         t1 = time.time()
         dt = t1-t0
 
-        bifasico.get_hist(t)
+        bifasico.get_hist(t, dt)
 
         ext_h5m = input_file + 'sol_direta_' + str(loop) + '.h5m'
         ext_vtk = input_file + 'sol_direta_' + str(loop) + '.vtk'

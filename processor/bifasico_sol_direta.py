@@ -61,7 +61,7 @@ class sol_direta_bif:
         self.gama = self.gama_w + self.gama_o
         self.fimin = mb.tag_get_data(self.phi_tag, all_volumes, flat=True).min()
         self.Vmin = mb.tag_get_data(self.volume_tag, all_volumes, flat=True).min()
-        historico = [np.array(['vpi','tempo', 'prod_agua', 'prod_oleo', 'wor'])]
+        historico = [np.array(['vpi','tempo', 'prod_agua', 'prod_oleo', 'wor', 'dt'])]
         np.save('historico', historico)
         self.delta_t = 0.0
         self.V_total = mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
@@ -199,7 +199,7 @@ class sol_direta_bif:
         vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         self.vpi += vpi
 
-    def get_hist(self, t):
+    def get_hist(self, t, dt):
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
 
@@ -208,7 +208,7 @@ class sol_direta_bif:
         wor = qw/float(qo)
 
 
-        hist = np.array([self.vpi, t, qw, qo, wor])
+        hist = np.array([self.vpi, t, qw, qo, wor, dt])
         historico = np.load('historico.npy')
         historico = np.append(historico, hist)
         np.save('historico', historico)
