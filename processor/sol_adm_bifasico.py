@@ -643,33 +643,57 @@ class sol_adm_bifasico:
     def organize_OP1_ADM(self, mb, OP1_AMS, all_volumes, dict_tags):
 
         AMS_TO_ADM = self.AMS_TO_ADM
-        lines=[]
-        cols=[]
-        data=[]
+        OP1_AMS = OP1_AMS.tolil()
+        # lines=[]
+        # cols=[]
+        # data=[]
         nivel_0=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array([1]))
         print("get nivel 1___")
+        # matriz=scipy.sparse.find(OP1_AMS)
+        # LIN=matriz[0]
+        # COL=matriz[1]
+        # DAT=matriz[2]
+        # del matriz
+        #
+        # cont=0
+        # for v in nivel_0:
+        #     ID_ADM=int(mb.tag_get_data(dict_tags['l1_ID'],v))
+        #     ID_global=int(mb.tag_get_data(dict_tags['ID_reord_tag'],v))
+        #     lines.append(ID_global)
+        #     cols.append(ID_ADM)
+        #     data.append(1)
+        #
+        #     dd=np.where(LIN==ID_global)
+        #     LIN=np.delete(LIN,dd,axis=0)
+        #     COL=np.delete(COL,dd,axis=0)
+        #     DAT=np.delete(DAT,dd,axis=0)
+
+        print("set_nivel 0")
+
+        # ID_ADM=[AMS_TO_ADM[str(k)] for k in COL]
+        # lines=np.concatenate([lines,LIN])
+        # cols=np.concatenate([cols,ID_ADM])
+        # data=np.concatenate([data,DAT])
+
+        # OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
+
+
+        sz1 = OP1_AMS.shape[1]
+        ID_ADM=mb.tag_get_data(dict_tags['l1_ID'],nivel_0, flat=True)
+        ID_global=mb.tag_get_data(dict_tags['ID_reord_tag'],nivel_0,flat=True)
+        t1 = time.time()
+        OP1_AMS[ID_global] = lil_matrix((len(ID_global), sz1))
+        lines = list(ID_global)
+        cols = list(ID_ADM)
+        data = list(np.repeat(1.0, len(cols)))
+
         matriz=scipy.sparse.find(OP1_AMS)
         LIN=matriz[0]
         COL=matriz[1]
         DAT=matriz[2]
         del matriz
 
-        cont=0
-        for v in nivel_0:
-            ID_ADM=int(mb.tag_get_data(dict_tags['l1_ID'],v))
-            ID_global=int(mb.tag_get_data(dict_tags['ID_reord_tag'],v))
-            lines.append(ID_global)
-            cols.append(ID_ADM)
-            data.append(1)
-
-            dd=np.where(LIN==ID_global)
-            LIN=np.delete(LIN,dd,axis=0)
-            COL=np.delete(COL,dd,axis=0)
-            DAT=np.delete(DAT,dd,axis=0)
-
-        print("set_nivel 0")
-
-        ID_ADM=[AMS_TO_ADM[str(k)] for k in COL]
+        ID_ADM = [AMS_TO_ADM[str(k)] for k in COL]
         lines=np.concatenate([lines,LIN])
         cols=np.concatenate([cols,ID_ADM])
         data=np.concatenate([data,DAT])
@@ -681,7 +705,6 @@ class sol_adm_bifasico:
         elem_Global_ID = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
         elem_ID1 = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
         OR_ADM=csc_matrix((np.repeat(1.0, len(all_volumes)),(elem_ID1,elem_Global_ID)),shape=(n1_adm,len(all_volumes)))
-
 
         return OP_ADM, OR_ADM
 
