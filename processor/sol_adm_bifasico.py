@@ -678,19 +678,6 @@ class sol_adm_bifasico:
         n1_adm = len(gids_nv1_adm)
         OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
 
-        # lines = []
-        # cols = []
-        # data = []
-        #
-        # for v in all_volumes:
-        #     elem_Global_ID = int(mb.tag_get_data(dict_tags['ID_reord_tag'], v, flat=True))
-        #     elem_ID1 = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
-        #     lines.append(elem_ID1)
-        #     cols.append(elem_Global_ID)
-        #     data.append(1)
-        #     #OR_ADM[elem_ID1][elem_Global_ID]=1
-        # OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1_adm,len(all_volumes)))
-
         elem_Global_ID = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
         elem_ID1 = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
         OR_ADM=csc_matrix((np.repeat(1.0, len(all_volumes)),(elem_ID1,elem_Global_ID)),shape=(n1_adm,len(all_volumes)))
