@@ -55,6 +55,6 @@ dados_bifasico:
   total_time: 1000
 
 tempos_vpi_impressao: [0.25, 0.5, 0.75, 0.8, 0.9]
-contar_loop: True
-contar_tempo: True
+contar_loop: False
+contar_tempo: False
 imprimir_sempre: True

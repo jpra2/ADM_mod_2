@@ -15,6 +15,7 @@ import io
 import yaml
 import scipy.sparse as sp
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
+from scipy.sparse.linalg import gmres
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -207,11 +208,27 @@ class OtherUtils:
         return T2, b
 
     @staticmethod
+    def set_boundary_dirichlet_matrix_v02(ids, values, b, T):
+        t = T.shape[0]
+        T2 = T.copy()
+        n1 = len(ids)
+        T2[ids] = sp.lil_matrix((n1, t))
+        T2[ids, ids] = np.ones(n1)
+        b[ids] = values
+
+        return T2, b
+
+    @staticmethod
     def set_boundary_neumann(map_local, map_values, b):
         for v, val in map_values.items():
             gid = map_local[v]
             b[gid] += val
 
+        return b
+
+    @staticmethod
+    def set_boundary_neumann_v02(ids, values, b):
+        b[ids] = values
         return b
 
     @staticmethod
@@ -785,3 +802,66 @@ class OtherUtils:
         T = T.tocsc()
         x = linalg.spsolve(T, b)
         return x
+
+    @staticmethod
+    def get_solution_gmres_scipy(T, b, x0=None, tol=1e-14, maxiter=None):
+        T = T.tocsc()
+        x, exitCode = gmres(T, b, x0=x0, tol=tol, maxiter=maxiter)
+        if exitCode > 0:
+            print('nao convergiu')
+            print(f'numero de iteracoes: {exitCode}')
+            import pdb; pdb.set_trace()
+            return exitCode
+        elif exitCode < 0:
+            print('erro na solucao')
+            print(f'{exitCode}')
+            import pdb; pdb.set_trace()
+            return exitCode
+
+        return x
+
+    @staticmethod
+    def get_Tmod_by_sparse_wirebasket_matrix(Tf_wire, wirebasket_numbers):
+
+        Tmod = Tf_wire.copy().tolil()
+        ni = wirebasket_numbers[0]
+        nf = wirebasket_numbers[1]
+        ne = wirebasket_numbers[2]
+        nv = wirebasket_numbers[3]
+
+        nni = wirebasket_numbers[0]
+        nnf = wirebasket_numbers[1] + nni
+        nne = wirebasket_numbers[2] + nnf
+        nnv = wirebasket_numbers[3] + nne
+
+        #internos
+        Aii = Tmod[0:nni, 0:nni]
+        Aif = Tmod[0:nni, nni:nnf]
+
+        #faces
+        Aff = Tmod[nni:nnf, nni:nnf]
+        Afe = Tmod[nni:nnf, nnf:nne]
+        soma = Aif.transpose().sum(axis=1)
+        d1 = np.matrix(Aff.diagonal()).reshape([nf, 1])
+        d1 += soma
+        Aff.setdiag(d1)
+
+        #arestas
+        Aee = Tmod[nnf:nne, nnf:nne]
+        Aev = Tmod[nnf:nne, nne:nnv]
+        soma = Afe.transpose().sum(axis=1)
+        d1 = np.matrix(Aee.diagonal()).reshape([ne, 1])
+        d1 += soma
+        Aee.setdiag(d1)
+        Ivv = sp.identity(nv)
+
+        As = {}
+        As['Aii'] = Aii
+        As['Aif'] = Aif
+        As['Aff'] = Aff
+        As['Afe'] = Afe
+        As['Aee'] = Aee
+        As['Aev'] = Aev
+        As['Ivv'] = Ivv
+
+        return As

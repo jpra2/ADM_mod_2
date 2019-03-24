@@ -1,7 +1,7 @@
 import numpy as np
 # from math import pi, sqrt
 from pymoab import core, types, rng, topo_util, skinner
-# import time
+import time
 # import pyximport; pyximport.install()
 import os
 # from PyTrilinos import Epetra, AztecOO, EpetraExt  # , Amesos
@@ -35,7 +35,7 @@ def get_op_AMS_TPFA(T_mod, wirebasket_numbers):
     OP, M = step1(T_mod, OP, loc)
     OP, M = step2(T_mod, OP, loc, M)
     OP = step3(T_mod, OP, loc, M)
-    rr = OP.sum(axis=1)
+    # rr = OP.sum(axis=1)
 
     return OP
 
@@ -117,4 +117,40 @@ def step3(t_mod, op, loc, MM):
 
 
     op[0:nni] = M
+    return op
+
+def get_OP_AMS_TPFA_by_AS(As, wirebasket_numbers):
+    
+    ni = wirebasket_numbers[0]
+    nf = wirebasket_numbers[1]
+    ne = wirebasket_numbers[2]
+    nv = wirebasket_numbers[3]
+
+    nni = ni
+    nnf = nni + nf
+    nne = nnf + ne
+    nnv = nne + nv
+
+    lines = np.arange(nne, nnv).astype(np.int32)
+    ntot = sum(wirebasket_numbers)
+    op = sp.lil_matrix((ntot, nv))
+    op[lines] = As['Ivv'].tolil()
+
+    M = As['Aee']
+    M = linalg.spsolve(M.tocsc(), sp.identity(ne).tocsc())
+    M = M.dot(-1*As['Aev'])
+    op[nnf:nne] = M.tolil()
+
+    M2 = As['Aff']
+    M2 = linalg.spsolve(M2.tocsc(), sp.identity(nf).tocsc())
+    M2 = M2.dot(-1*As['Afe'])
+    M = M2.dot(M)
+    op[nni:nnf] = M.tolil()
+
+    M2 = As['Aii']
+    M2 = linalg.spsolve(M2.tocsc(), sp.identity(ni).tocsc())
+    M2 = M2.dot(-1*As['Aif'])
+    M = M2.dot(M)
+    op[0:nni] = M.tolil()
+
     return op

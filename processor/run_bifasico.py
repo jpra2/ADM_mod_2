@@ -60,6 +60,10 @@ wirebasket_numbers = [sol_adm.ni, sol_adm.nf, sol_adm.na, sol_adm.nv]
 wirebasket_numbers_nv1 = [sol_adm.nint, sol_adm.nfac, sol_adm.nare, sol_adm.nver]
 map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)))
 map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)))
+ids_volumes_d = mb.tag_get_data(tags_1['ID_reord_tag'], sol_adm.volumes_d, flat=True)
+vals_d  = mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)
+ids_volumes_n = mb.tag_get_data(tags_1['ID_reord_tag'], sol_adm.volumes_n, flat=True)
+vals_n  = mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)
 meshset_vertices = mb.create_meshset()
 mb.add_entities(meshset_vertices, sol_adm.vertices)
 meshset_vertices_nv2 = mb.create_meshset()
@@ -74,11 +78,11 @@ tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB
 tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
 def run_PMS(n1_adm, n2_adm, loop):
-    if loop > 0:
-        Pms2_ant = mb.tag_get_data(tags_1['PMS2'], sol_adm.wirebasket_elems, flat=True)
+    # if loop > 0:
+    #     Pms2_ant = mb.tag_get_data(tags_1['PMS2'], sol_adm.wirebasket_elems, flat=True)
 
 
-    As, s_grav = sol_adm.get_AS_structured(mb, tags_1, faces_in, all_volumes, bif_utils.mobi_in_faces_tag, map_global)
+    As, s_grav = sol_adm.get_AS_structured_v2(mb, tags_1, faces_in, all_volumes, bif_utils.mobi_in_faces_tag, map_global)
     # with io.open('As.yaml', 'w', encoding='utf8') as outfile:
     #         yaml.dump(As, outfile, default_flow_style=False, allow_unicode=True)
     # np.save('s_grav', s_grav)
@@ -86,14 +90,17 @@ def run_PMS(n1_adm, n2_adm, loop):
     # with open("As.yaml", 'r') as stream:
     #     As = yaml.load(stream)
     # s_grav = np.load('s_grav.npy')
+    # tmod = oth.get_Tmod_by_sparse_wirebasket_matrix(As['Tf'], wirebasket_numbers)
+    # import pdb; pdb.set_trace()
 
-    OP1_AMS = oth.get_op_by_wirebasket_Tf(As['Tf'], wirebasket_numbers)
+    # OP1_AMS = oth.get_op_by_wirebasket_Tf(As['Tf'], wirebasket_numbers)
 
-    # OP1_AMS = sol_adm.get_OP1_AMS_structured(As)
+    # OP1_AMS = sol_adm.get_OP1_AMS_structured(As, wirebasket_numbers)
+
+    OP1_AMS = prol_tpfa.get_OP_AMS_TPFA_by_AS(As, wirebasket_numbers)
 
     OP1_ADM, OR1_ADM = sol_adm.organize_OP1_ADM(mb, OP1_AMS, all_volumes, tags_1)
-    if loop > 2:
-        import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     # sp.save_npz('OP1_AMS', OP1_AMS)
     # sp.save_npz('OP1_ADM', OP1_ADM)
     # sp.save_npz('OR1_ADM', OR1_ADM)
@@ -101,7 +108,6 @@ def run_PMS(n1_adm, n2_adm, loop):
     # OP1_AMS = sp.load_npz('OP1_AMS.npz')
     # OP1_ADM = sp.load_npz('OP1_ADM.npz')
     # OR1_ADM = sp.load_npz('OR1_ADM.npz')
-
 
     T1_AMS = sol_adm.OR1_AMS.dot(As['Tf'])
     T1_AMS = T1_AMS.dot(OP1_AMS)
@@ -111,15 +117,13 @@ def run_PMS(n1_adm, n2_adm, loop):
     OP2_AMS = sol_adm.G.transpose().dot(OP2_AMS)
 
     OP2_ADM, OR2_ADM = sol_adm.organize_OP2_ADM(mb, OP2_AMS, all_volumes, tags_1, n1_adm, n2_adm)
-    if loop > 1:
-        import pdb; pdb.set_trace()
-
-
 
     Tf2 = As['Tf'].copy()
     Tf2 = Tf2.tolil()
-    Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
-    b = oth.set_boundary_neumann(map_global, map_values_n, b)
+    # Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
+    Tf2, b = oth.set_boundary_dirichlet_matrix_v02(ids_volumes_d, vals_d, s_grav, Tf2)
+    # b = oth.set_boundary_neumann(map_global, map_values_n, b)
+    b = oth.set_boundary_neumann_v02(ids_volumes_n, vals_n, b)
 
     T1_ADM = OR1_ADM.dot(Tf2)
     T1_ADM = T1_ADM.dot(OP1_ADM)
@@ -127,10 +131,12 @@ def run_PMS(n1_adm, n2_adm, loop):
     T1_ADM = T1_ADM.tocsc()
 
     PC1_ADM = oth.get_solution(T1_ADM, b1_ADM)
+    # PC1_ADM = oth.get_solution_gmres_scipy(T1_ADM, b1_ADM)
     Pms1 = OP1_ADM.dot(PC1_ADM)
     mb.tag_set_data(tags_1['PMS1'], sol_adm.wirebasket_elems, Pms1)
     Tf2 = Tf2.tocsc()
     Pf = oth.get_solution(Tf2, b)
+    # Pf = oth.get_solution_gmres_scipy(Tf2, b)
     mb.tag_set_data(tags_1['PF'], sol_adm.wirebasket_elems, Pf)
     erro1 = 100*np.absolute((Pf - Pms1)/Pf)
     mb.tag_set_data(tags_1['ERRO1'], sol_adm.wirebasket_elems, erro1)
@@ -140,17 +146,13 @@ def run_PMS(n1_adm, n2_adm, loop):
     b2_ADM = OR2_ADM.dot(b1_ADM)
     T2_ADM = T2_ADM.tocsc()
 
-    PC2_ADM = oth.get_solution(T2_ADM, b2_ADM)
+    # PC2_ADM = oth.get_solution(T2_ADM, b2_ADM)
+    PC2_ADM = oth.get_solution_gmres_scipy(T2_ADM, b2_ADM)
     Pms2 = OP2_ADM.dot(PC2_ADM)
     Pms2 = OP1_ADM.dot(Pms2)
     mb.tag_set_data(tags_1['PMS2'], sol_adm.wirebasket_elems, Pms2)
     erro2 = 100*np.absolute((Pf - Pms2)/Pf)
     mb.tag_set_data(tags_1['ERRO2'], sol_adm.wirebasket_elems, erro2)
-
-    # T1_ADM = OR1_ADM.dot(As['Tf'])
-    # T1_ADM = T1_ADM.dot(OP1_ADM)
-
-    # import pdb; pdb.set_trace()
 
 def run_2(t):
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
@@ -247,7 +249,7 @@ if ADM == True:
         ext_h5m = input_file + 'sol_multiescala_' + str(loop) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop) + '.vtk'
 
-        if loop == 0 or imprimir_sempre:
+        if loop == 1 or imprimir_sempre:
             mb.write_file(ext_vtk, [vv])
 
         if verif_vpi:
@@ -266,13 +268,8 @@ if ADM == True:
         if verif:
             run_3(loop)
 
-        testando = 'teste_' + str(loop) + '.vtk'
-        mb.write_file(testando, [vv])
 
-
-
-
-else:
+elif ADM == False:
     os.chdir(bifasico_sol_direta_dir)
     loader = importlib.machinery.SourceFileLoader('bifasico_sol_direta', parent_dir + '/bifasico_sol_direta.py')
     bifasico = loader.load_module('bifasico_sol_direta').sol_direta_bif(mb, mtu, all_volumes)

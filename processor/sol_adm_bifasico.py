@@ -6,6 +6,7 @@ import os
 import scipy
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find, lil_matrix
 import yaml
+import scipy.sparse as sp
 
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +32,7 @@ class sol_adm_bifasico:
         self.nf=len(self.faces)
         self.na=len(self.arestas)
         self.nv=len(self.vertices)
+        self.wirebasket_numbers = [self.ni, self.nf, self.na, self.nv]
 
         self.nni=self.ni
         self.nnf=self.nni+self.nf
@@ -196,29 +198,29 @@ class sol_adm_bifasico:
                 cii.append(Gid_1)
                 dii.append(keq)
 
-                # lii.append(Gid_1)
-                # cii.append(Gid_1)
-                # dii.append(-keq)
+                lii.append(Gid_1)
+                cii.append(Gid_1)
+                dii.append(-keq)
+
+                lii.append(Gid_2)
+                cii.append(Gid_2)
+                dii.append(-keq)
+
+                # if Gid_1 in l_ii:
+                #     index = l_ii.index(Gid_1)
+                #     d_ii[index] -= keq
+                # else:
+                #     l_ii.append(Gid_1)
+                #     c_ii.append(Gid_1)
+                #     d_ii.append(-keq)
                 #
-                # lii.append(Gid_2)
-                # cii.append(Gid_2)
-                # dii.append(-keq)
-
-                if Gid_1 in l_ii:
-                    index = l_ii.index(Gid_1)
-                    d_ii[index] -= keq
-                else:
-                    l_ii.append(Gid_1)
-                    c_ii.append(Gid_1)
-                    d_ii.append(-keq)
-
-                if Gid_2 in l_ii:
-                    index = l_ii.index(Gid_2)
-                    d_ii[index] -= keq
-                else:
-                    l_ii.append(Gid_2)
-                    c_ii.append(Gid_2)
-                    d_ii.append(-keq)
+                # if Gid_2 in l_ii:
+                #     index = l_ii.index(Gid_2)
+                #     d_ii[index] -= keq
+                # else:
+                #     l_ii.append(Gid_2)
+                #     c_ii.append(Gid_2)
+                #     d_ii.append(-keq)
 
 
             elif Gid_1<ni and Gid_2>=ni and Gid_2<ni+nf:
@@ -226,34 +228,34 @@ class sol_adm_bifasico:
                 cif.append(Gid_2-ni)
                 dif.append(keq)
 
-                # lii.append(Gid_1)
-                # cii.append(Gid_1)
-                # dii.append(-keq)
+                lii.append(Gid_1)
+                cii.append(Gid_1)
+                dii.append(-keq)
 
-                if Gid_1 in l_ii:
-                    index = l_ii.index(Gid_1)
-                    d_ii[index] -= keq
-                else:
-                    l_ii.append(Gid_1)
-                    c_ii.append(Gid_1)
-                    d_ii.append(-keq)
+                # if Gid_1 in l_ii:
+                #     index = l_ii.index(Gid_1)
+                #     d_ii[index] -= keq
+                # else:
+                #     l_ii.append(Gid_1)
+                #     c_ii.append(Gid_1)
+                #     d_ii.append(-keq)
 
             elif Gid_2<ni and Gid_1>=ni and Gid_1<ni+nf:
                 lif.append(Gid_2)
                 cif.append(Gid_1-ni)
                 dif.append(keq)
 
-                # lii.append(Gid_2)
-                # cii.append(Gid_2)
-                # dii.append(-keq)
+                lii.append(Gid_2)
+                cii.append(Gid_2)
+                dii.append(-keq)
 
-                if Gid_2 in l_ii:
-                    index = l_ii.index(Gid_2)
-                    d_ii[index] -= keq
-                else:
-                    l_ii.append(Gid_2)
-                    c_ii.append(Gid_2)
-                    d_ii.append(-keq)
+                # if Gid_2 in l_ii:
+                #     index = l_ii.index(Gid_2)
+                #     d_ii[index] -= keq
+                # else:
+                #     l_ii.append(Gid_2)
+                #     c_ii.append(Gid_2)
+                #     d_ii.append(-keq)
 
             elif Gid_1>=ni and Gid_1<ni+nf and Gid_2>=ni and Gid_2<ni+nf:
                 lff.append(Gid_1-ni)
@@ -264,63 +266,63 @@ class sol_adm_bifasico:
                 cff.append(Gid_1-ni)
                 dff.append(keq)
 
-                # lff.append(Gid_1-ni)
-                # cff.append(Gid_1-ni)
-                # dff.append(-keq)
+                lff.append(Gid_1-ni)
+                cff.append(Gid_1-ni)
+                dff.append(-keq)
+
+                lff.append(Gid_2-ni)
+                cff.append(Gid_2-ni)
+                dff.append(-keq)
+
+                # if Gid_1-ni in l_ff:
+                #     index = l_ff.index(Gid_1-ni)
+                #     d_ff[index] -= keq
+                # else:
+                #     l_ff.append(Gid_1-ni)
+                #     c_ff.append(Gid_1-ni)
+                #     d_ff.append(-keq)
                 #
-                # lff.append(Gid_2-ni)
-                # cff.append(Gid_2-ni)
-                # dff.append(-keq)
-
-                if Gid_1-ni in l_ff:
-                    index = l_ff.index(Gid_1-ni)
-                    d_ff[index] -= keq
-                else:
-                    l_ff.append(Gid_1-ni)
-                    c_ff.append(Gid_1-ni)
-                    d_ff.append(-keq)
-
-                if Gid_2-ni in l_ff:
-                    index = l_ff.index(Gid_2-ni)
-                    d_ff[index] -= keq
-                else:
-                    l_ff.append(Gid_2-ni)
-                    c_ff.append(Gid_2-ni)
-                    d_ff.append(-keq)
+                # if Gid_2-ni in l_ff:
+                #     index = l_ff.index(Gid_2-ni)
+                #     d_ff[index] -= keq
+                # else:
+                #     l_ff.append(Gid_2-ni)
+                #     c_ff.append(Gid_2-ni)
+                #     d_ff.append(-keq)
 
             elif Gid_1>=ni and Gid_1<ni+nf and Gid_2>=ni+nf and Gid_2<ni+nf+na:
                 lfe.append(Gid_1-ni)
                 cfe.append(Gid_2-ni-nf)
                 dfe.append(keq)
 
-                # lff.append(Gid_1-ni)
-                # cff.append(Gid_1-ni)
-                # dff.append(-keq)
+                lff.append(Gid_1-ni)
+                cff.append(Gid_1-ni)
+                dff.append(-keq)
 
-                if Gid_1-ni in l_ff:
-                    index = l_ff.index(Gid_1-ni)
-                    d_ff[index] -= keq
-                else:
-                    l_ff.append(Gid_1-ni)
-                    c_ff.append(Gid_1-ni)
-                    d_ff.append(-keq)
+                # if Gid_1-ni in l_ff:
+                #     index = l_ff.index(Gid_1-ni)
+                #     d_ff[index] -= keq
+                # else:
+                #     l_ff.append(Gid_1-ni)
+                #     c_ff.append(Gid_1-ni)
+                #     d_ff.append(-keq)
 
             elif Gid_2>=ni and Gid_2<ni+nf and Gid_1>=ni+nf and Gid_1<ni+nf+na:
                 lfe.append(Gid_2-ni)
                 cfe.append(Gid_1-ni-nf)
                 dfe.append(keq)
 
-                # lff.append(Gid_2-ni)
-                # cff.append(Gid_2-ni)
-                # dff.append(-keq)
+                lff.append(Gid_2-ni)
+                cff.append(Gid_2-ni)
+                dff.append(-keq)
 
-                if Gid_2-ni in l_ff:
-                    index = l_ff.index(Gid_2-ni)
-                    d_ff[index] -= keq
-                else:
-                    l_ff.append(Gid_2-ni)
-                    c_ff.append(Gid_2-ni)
-                    d_ff.append(-keq)
+                # if Gid_2-ni in l_ff:
+                #     index = l_ff.index(Gid_2-ni)
+                #     d_ff[index] -= keq
+                # else:
+                #     l_ff.append(Gid_2-ni)
+                #     c_ff.append(Gid_2-ni)
+                #     d_ff.append(-keq)
 
             elif Gid_1>=ni+nf and Gid_1<ni+nf+na and Gid_2>=ni+nf and Gid_2<ni+nf+na:
                 lee.append(Gid_1-ni-nf)
@@ -331,29 +333,29 @@ class sol_adm_bifasico:
                 cee.append(Gid_1-ni-nf)
                 dee.append(keq)
 
-                # lee.append(Gid_1-ni-nf)
-                # cee.append(Gid_1-ni-nf)
-                # dee.append(-keq)
+                lee.append(Gid_1-ni-nf)
+                cee.append(Gid_1-ni-nf)
+                dee.append(-keq)
+
+                lee.append(Gid_2-ni-nf)
+                cee.append(Gid_2-ni-nf)
+                dee.append(-keq)
+
+                # if Gid_1-ni-nf in l_ee:
+                #     index = l_ee.index(Gid_1-ni-nf)
+                #     d_ee[index] -= keq
+                # else:
+                #     l_ee.append(Gid_1-ni-nf)
+                #     c_ee.append(Gid_1-ni-nf)
+                #     d_ee.append(-keq)
                 #
-                # lee.append(Gid_2-ni-nf)
-                # cee.append(Gid_2-ni-nf)
-                # dee.append(-keq)
-
-                if Gid_1-ni-nf in l_ee:
-                    index = l_ee.index(Gid_1-ni-nf)
-                    d_ee[index] -= keq
-                else:
-                    l_ee.append(Gid_1-ni-nf)
-                    c_ee.append(Gid_1-ni-nf)
-                    d_ee.append(-keq)
-
-                if Gid_2-ni-nf in l_ee:
-                    index = l_ee.index(Gid_2-ni-nf)
-                    d_ee[index] -= keq
-                else:
-                    l_ee.append(Gid_2-ni-nf)
-                    c_ee.append(Gid_2-ni-nf)
-                    d_ee.append(-keq)
+                # if Gid_2-ni-nf in l_ee:
+                #     index = l_ee.index(Gid_2-ni-nf)
+                #     d_ee[index] -= keq
+                # else:
+                #     l_ee.append(Gid_2-ni-nf)
+                #     c_ee.append(Gid_2-ni-nf)
+                #     d_ee.append(-keq)
 
             elif Gid_1>=ni+nf and Gid_1<ni+nf+na and Gid_2>=ni+nf+na:
                 lev.append(Gid_1-ni-nf)
@@ -364,30 +366,30 @@ class sol_adm_bifasico:
                 cee.append(Gid_1-ni-nf)
                 dee.append(-keq)
 
-                if Gid_1-ni-nf in l_ee:
-                    index = l_ee.index(Gid_1-ni-nf)
-                    d_ee[index] -= keq
-                else:
-                    l_ee.append(Gid_1-ni-nf)
-                    c_ee.append(Gid_1-ni-nf)
-                    d_ee.append(-keq)
+                # if Gid_1-ni-nf in l_ee:
+                #     index = l_ee.index(Gid_1-ni-nf)
+                #     d_ee[index] -= keq
+                # else:
+                #     l_ee.append(Gid_1-ni-nf)
+                #     c_ee.append(Gid_1-ni-nf)
+                #     d_ee.append(-keq)
 
             elif Gid_2>=ni+nf and Gid_2<ni+nf+na and Gid_1>=ni+nf+na:
                 lev.append(Gid_2-ni-nf)
                 cev.append(Gid_1-ni-nf-na)
                 dev.append(keq)
 
-                # lee.append(Gid_2-ni-nf)
-                # cee.append(Gid_2-ni-nf)
-                # dee.append(-keq)
+                lee.append(Gid_2-ni-nf)
+                cee.append(Gid_2-ni-nf)
+                dee.append(-keq)
 
-                if Gid_2-ni-nf in l_ee:
-                    index = l_ee.index(Gid_2-ni-nf)
-                    d_ee[index] -= keq
-                else:
-                    l_ee.append(Gid_2-ni-nf)
-                    c_ee.append(Gid_2-ni-nf)
-                    d_ee.append(-keq)
+                # if Gid_2-ni-nf in l_ee:
+                #     index = l_ee.index(Gid_2-ni-nf)
+                #     d_ee[index] -= keq
+                # else:
+                #     l_ee.append(Gid_2-ni-nf)
+                #     c_ee.append(Gid_2-ni-nf)
+                #     d_ee.append(-keq)
 
             elif Gid_1>=ni+nf+na and Gid_2>=ni+nf+na:
                 lvv.append(Gid_1)
@@ -416,18 +418,18 @@ class sol_adm_bifasico:
         lines_tf += lines_ttf
         cols_tf += cols_ttf
         data_tf += data_ttf
-        lii += l_ii
-        cii += c_ii
-        dii += d_ii
-        lff += l_ff
-        cff += c_ff
-        dff += d_ff
-        lee += l_ee
-        cee += c_ee
-        dee += d_ee
-        lvv += l_vv
-        cvv += c_vv
-        dvv += d_vv
+        # lii += l_ii
+        # cii += c_ii
+        # dii += d_ii
+        # lff += l_ff
+        # cff += c_ff
+        # dff += d_ff
+        # lee += l_ee
+        # cee += c_ee
+        # dee += d_ee
+        # lvv += l_vv
+        # cvv += c_vv
+        # dvv += d_vv
 
         print("took: ",time.time()-ty)
         print("get As")
@@ -453,6 +455,47 @@ class sol_adm_bifasico:
         As['Ivv'] = Ivv
         As['Tf'] = Tf
 
+        return As, s_grav
+
+    def get_AS_structured_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
+        print('get As')
+
+        all_s_gravs = mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)
+        s_grav = np.zeros(len(all_volumes))
+        all_mobis = mb.tag_get_data(mobi_tag, faces_in, flat=True)
+
+        lines_tf = []
+        cols_tf = []
+        data_tf = []
+
+        print("def As")
+        ty=time.time()
+        for i, f in enumerate(faces_in):
+            keq = all_mobis[i]
+            adjs = mb.get_adjacencies(f, 3)
+            Gid_1 = map_volumes[adjs[0]]
+            Gid_2 = map_volumes[adjs[1]]
+
+            lines_tf += [Gid_1, Gid_2]
+            cols_tf += [Gid_2, Gid_1]
+            data_tf += [keq, keq]
+
+            flux_grav = -all_s_gravs[i]
+            s_grav[Gid_1] += flux_grav
+            s_grav[Gid_2] -= flux_grav
+
+        if self.gravity == False:
+            s_grav = np.zeros(len(all_volumes))
+
+        print("took: ",time.time()-ty)
+        n = len(all_volumes)
+        Tf = csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
+        Tf = Tf.tolil()
+        d1 = np.array(Tf.sum(axis=1)).reshape(1, n)[0]*(-1)
+        Tf.setdiag(d1)
+
+        As = oth.get_Tmod_by_sparse_wirebasket_matrix(Tf, self.wirebasket_numbers)
+        As['Tf'] = Tf
         return As, s_grav
 
     def get_OP1_AMS_structured(self, As):
@@ -635,18 +678,23 @@ class sol_adm_bifasico:
         n1_adm = len(gids_nv1_adm)
         OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
 
-        lines = []
-        cols = []
-        data = []
+        # lines = []
+        # cols = []
+        # data = []
+        #
+        # for v in all_volumes:
+        #     elem_Global_ID = int(mb.tag_get_data(dict_tags['ID_reord_tag'], v, flat=True))
+        #     elem_ID1 = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
+        #     lines.append(elem_ID1)
+        #     cols.append(elem_Global_ID)
+        #     data.append(1)
+        #     #OR_ADM[elem_ID1][elem_Global_ID]=1
+        # OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1_adm,len(all_volumes)))
 
-        for v in all_volumes:
-            elem_Global_ID = int(mb.tag_get_data(dict_tags['ID_reord_tag'], v, flat=True))
-            elem_ID1 = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
-            lines.append(elem_ID1)
-            cols.append(elem_Global_ID)
-            data.append(1)
-            #OR_ADM[elem_ID1][elem_Global_ID]=1
-        OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1_adm,len(all_volumes)))
+        elem_Global_ID = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
+        elem_ID1 = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
+        OR_ADM=csc_matrix((np.repeat(1.0, len(all_volumes)),(elem_ID1,elem_Global_ID)),shape=(n1_adm,len(all_volumes)))
+
 
         return OP_ADM, OR_ADM
 

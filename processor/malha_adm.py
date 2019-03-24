@@ -38,7 +38,7 @@ class malha_adm:
 
         L2_meshset = self.L2_meshset
         finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
-        finos = list(mb.get_entities_by_handle(finos))
+        finos = mb.get_entities_by_handle(finos)
         intermediarios = self.intermediarios
         ######################################################################
         # ni = ID do elemento no nível i
@@ -104,12 +104,6 @@ class malha_adm:
         print('Definição da malha ADM: ',time.time()-t0)
         t0=time.time()
 
-        # av=mb.create_meshset()
-        # for v in all_volumes:
-        #     mb.add_entities(av,[v])
-
-        # mb.add_entities(av, all_volumes)
-
         # fazendo os ids comecarem de 0 em todos os niveis
         tags = [self.tags['l1_ID'], self.tags['l2_ID']]
         for tag in tags:
@@ -117,8 +111,3 @@ class malha_adm:
             minim = all_gids.min()
             all_gids -= minim
             mb.tag_set_data(tag, all_volumes, all_gids)
-
-        # os.chdir(flying_dir)
-        # ext_h5m_adm = self.input_file + '_malha_adm.h5m'
-        # mb.write_file(ext_h5m_adm)
-        # os.chdir(parent_dir)

@@ -18,7 +18,6 @@ import importlib.machinery
 loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
 oth = loader.load_module('others_utils').OtherUtils
 
-
 class sol_direta_bif:
     def __init__(self, mb, mtu, all_volumes):
         self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
