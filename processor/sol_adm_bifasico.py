@@ -500,7 +500,6 @@ class sol_adm_bifasico:
 
     def get_OP1_AMS_structured(self, As):
 
-        import pdb; pdb.set_trace()
         invAee=oth.lu_inv(As['Aee'])
         M2=-invAee*As['Aev']
         P=vstack([M2,As['Ivv']]) #P=np.concatenate((-np.dot(np.linalg.inv(Aee),Aev),Ivv), axis=0)
@@ -648,7 +647,9 @@ class sol_adm_bifasico:
         # cols=[]
         # data=[]
         nivel_0=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array([1]))
+
         print("get nivel 1___")
+        # print("get nivel 1___")
         # matriz=scipy.sparse.find(OP1_AMS)
         # LIN=matriz[0]
         # COL=matriz[1]
@@ -674,37 +675,57 @@ class sol_adm_bifasico:
         # lines=np.concatenate([lines,LIN])
         # cols=np.concatenate([cols,ID_ADM])
         # data=np.concatenate([data,DAT])
-
+        #
+        # import pdb; pdb.set_trace()
+        #
+        #
+        # gids_nv1_adm = np.unique(mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True))
+        # n1_adm = len(gids_nv1_adm)
         # OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
+        ta1 = time.time()
+        OP1 = OP1_AMS.copy()
+        OP1 = OP1.tolil()
+        ID_global1 = mb.tag_get_data(dict_tags['ID_reord_tag'],nivel_0, flat=True)
+        OP1[ID_global1]=csc_matrix((1,OP1.shape[1]))
+        gids_nv1_adm = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
+        n1_adm = len(np.unique(gids_nv1_adm))
 
+        IDs_ADM1=mb.tag_get_data(dict_tags['l1_ID'],nivel_0, flat=True)
 
-        sz1 = OP1_AMS.shape[1]
-        ID_ADM=mb.tag_get_data(dict_tags['l1_ID'],nivel_0, flat=True)
-        ID_global=mb.tag_get_data(dict_tags['ID_reord_tag'],nivel_0,flat=True)
-        t1 = time.time()
-        OP1_AMS[ID_global] = lil_matrix((len(ID_global), sz1))
-        lines = list(ID_global)
-        cols = list(ID_ADM)
-        data = list(np.repeat(1.0, len(cols)))
+        m=find(OP1)
+        l1=m[0]
+        c1=m[1]
+        d1=m[2]
+        lines=ID_global1
+        cols=IDs_ADM1
+        data=np.repeat(1,len(lines))
 
-        matriz=scipy.sparse.find(OP1_AMS)
-        LIN=matriz[0]
-        COL=matriz[1]
-        DAT=matriz[2]
-        del matriz
+        ID_ADM1=[AMS_TO_ADM[str(k)] for k in c1]
+        lines=np.concatenate([lines,l1])
+        cols=np.concatenate([cols,ID_ADM1])
+        data=np.concatenate([data,d1])
 
-        ID_ADM = [AMS_TO_ADM[str(k)] for k in COL]
-        lines=np.concatenate([lines,LIN])
-        cols=np.concatenate([cols,ID_ADM])
-        data=np.concatenate([data,DAT])
+        opad1=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
+        print("opad1",time.time()-ta1)
+        OP_ADM=opad1
 
-        gids_nv1_adm = np.unique(mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True))
-        n1_adm = len(gids_nv1_adm)
-        OP_ADM=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),n1_adm))
+        print("set_nivel 0")
 
-        elem_Global_ID = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
-        elem_ID1 = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
-        OR_ADM=csc_matrix((np.repeat(1.0, len(all_volumes)),(elem_ID1,elem_Global_ID)),shape=(n1_adm,len(all_volumes)))
+        # lines = []
+        # cols = []
+        # data = []
+
+        # for v in all_volumes:
+        #     elem_Global_ID = int(mb.tag_get_data(dict_tags['ID_reord_tag'], v, flat=True))
+        #     elem_ID1 = int(mb.tag_get_data(dict_tags['l1_ID'], v, flat=True))
+        #     lines.append(elem_ID1)
+        #     cols.append(elem_Global_ID)
+        #     data.append(1)
+        #     #OR_ADM[elem_ID1][elem_Global_ID]=1
+        cols = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
+        lines = mb.tag_get_data(dict_tags['l1_ID'], all_volumes, flat=True)
+        data = np.ones(len(lines))
+        OR_ADM=csc_matrix((data,(lines,cols)),shape=(n1_adm,len(all_volumes)))
 
         return OP_ADM, OR_ADM
 
@@ -760,6 +781,7 @@ class sol_adm_bifasico:
     def set_boundary_dirichlet(self, T, b, map_values, map_local):
         t = T.shape[0]
         T2 = T.copy()
+        T2 = T2.tolil()
         zeros = np.zeros(t)
         for v, value in map_values.items():
             gid = map_local[v]

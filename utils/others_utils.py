@@ -732,6 +732,7 @@ class OtherUtils:
         """
         M = matriz do scipy
         """
+        M = M.tocsc()
 
         L=M.shape[0]
         s=1000
@@ -793,7 +794,7 @@ class OtherUtils:
         inds_tf_mod = OtherUtils.get_tmod_by_inds(inds_tf_mod, wirebasket_numbers)
         Tf_mod = sp.lil_matrix(tuple(inds_tf_mod[3]))
         Tf_mod[inds_tf_mod[0], inds_tf_mod[1]] = inds_tf_mod[2]
-        OP2_AMS = prol_tpfa.get_op_AMS_TPFA(Tf_mod, wirebasket_numbers).tocsc()
+        OP2_AMS = prol_tpfa.get_op_AMS_TPFA_dep(Tf_mod, wirebasket_numbers).tocsc()
 
         return OP2_AMS
 
@@ -801,23 +802,6 @@ class OtherUtils:
     def get_solution(T, b):
         T = T.tocsc()
         x = linalg.spsolve(T, b)
-        return x
-
-    @staticmethod
-    def get_solution_gmres_scipy(T, b, x0=None, tol=1e-14, maxiter=None):
-        T = T.tocsc()
-        x, exitCode = gmres(T, b, x0=x0, tol=tol, maxiter=maxiter)
-        if exitCode > 0:
-            print('nao convergiu')
-            print(f'numero de iteracoes: {exitCode}')
-            import pdb; pdb.set_trace()
-            return exitCode
-        elif exitCode < 0:
-            print('erro na solucao')
-            print(f'{exitCode}')
-            import pdb; pdb.set_trace()
-            return exitCode
-
         return x
 
     @staticmethod
