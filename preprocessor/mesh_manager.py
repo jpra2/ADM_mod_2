@@ -153,16 +153,26 @@ class MeshManager:
         phi = np.load('spe10_perms_and_phi.npz')['phi']
         os.chdir(parent_dir)
 
-        nx = 18
-        ny = 18
-        nz = 18
+        nx = 60
+        ny = 220
+        nz = 85
         perms = []
         phis = []
+
+        v0 = self.all_volumes[0]
+
+        points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
+        coords = self.mtu.get_coords(points).reshape([len(points), 3])
+        maxs = coords.max(axis=0)
+        mins = coords.min(axis=0)
+
+        hs = maxs - mins
 
         k = 1.0
         for v in self.all_volumes:
             centroid = self.mtu.get_average_position([v])
-            ijk = np.array([centroid[0]//1.0, centroid[1]//1.0, centroid[2]//1.0])
+            # ijk = np.array([centroid[0]//1.0, centroid[1]//1.0, centroid[2]//1.0])
+            ijk = np.array([centroid[0]//hs[0], centroid[1]//hs[1], centroid[2]//hs[2]])
             e = int(ijk[0] + ijk[1]*nx + ijk[2]*nx*ny)
             # perm = ks[e]*k
             # fi = phi[e]

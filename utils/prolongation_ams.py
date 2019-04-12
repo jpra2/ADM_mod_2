@@ -14,9 +14,12 @@ import sys
 import io
 import yaml
 import scipy.sparse as sp
-from scipy.sparse import linalg
+from scipy.sparse import linalg, find, csc_matrix
+import time
 
-def get_op_AMS_TPFA(T_mod, wirebasket_numbers):
+__all__ = ['get_op_AMS_TPFA']
+
+def get_op_AMS_TPFA_dep(T_mod, wirebasket_numbers):
     ni = wirebasket_numbers[0]
     nf = wirebasket_numbers[1]
     ne = wirebasket_numbers[2]
@@ -118,3 +121,77 @@ def step3(t_mod, op, loc, MM):
 
     op[0:nni] = M
     return op
+
+def lu_inv4(M,lines):
+    M = M.tocsc()
+    lines=np.array(lines)
+    cols=lines
+    L=len(lines)
+    s=1000
+    n=int(L/s)
+    r=int(L-int(L/s)*s)
+    tinv=time.time()
+    LU=linalg.splu(M)
+    if L<s:
+        l=lines
+        c=range(len(l))
+        d=np.repeat(1,L)
+        B=sp.csr_matrix((d,(l,c)),shape=(M.shape[0],L))
+        B=B.toarray()
+        inversa=csc_matrix(LU.solve(B))
+    else:
+        c=range(s)
+        d=np.repeat(1,s)
+        for i in range(n):
+            l=lines[s*i:s*(i+1)]
+            B=csc_matrix((d,(l,c)),shape=(M.shape[0],s))
+            B=B.toarray()
+            if i==0:
+                inversa=csc_matrix(LU.solve(B))
+            else:
+                inversa=csc_matrix(sp.hstack([inversa,csc_matrix(LU.solve(B))]))
+            print(time.time()-tinv,i*s,'/',len(lines),'/',M.shape[0],"tempo de inversão")
+
+        if r>0:
+            l=lines[s*n:L]
+            c=range(r)
+            d=np.repeat(1,r)
+            B=csc_matrix((d,(l,c)),shape=(M.shape[0],r))
+            B=B.toarray()
+            inversa=csc_matrix(sp.hstack([inversa,csc_matrix(LU.solve(B))]))
+    tk1=time.time()
+    f=find(inversa.tocsr())
+    l=f[0]
+    cc=f[1]
+    d=f[2]
+    pos_to_col=dict(zip(range(len(cols)),cols))
+    cg=[pos_to_col[c] for c in cc]
+    inversa=csc_matrix((d,(l,cg)),shape=(M.shape[0],M.shape[0]))
+    print(tk1-tinv,L,time.time()-tk1,len(lines),'/',M.shape[0],"tempo de inversão")
+    return inversa
+
+def get_op_AMS_TPFA(As):
+    # ids_arestas=np.where(Aev.sum(axis=1)==0)[0]
+    # ids_arestas_slin_m0=np.setdiff1d(range(na),ids_arestas)
+    ids_arestas_slin_m0 = np.nonzero(As['Aev'].sum(axis=1))[0]
+
+    # ids_faces=np.where(Afe.sum(axis=1)==0)[0]
+    # ids_faces_slin_m0=np.setdiff1d(range(nf),ids_faces)
+    ids_faces_slin_m0 = np.nonzero(As['Afe'].sum(axis=1))[0]
+
+    # ids_internos=np.where(Aif.sum(axis=1)==0)[0]
+    # ids_internos_slin_m0=np.setdiff1d(range(ni),ids_internos)
+    ids_internos_slin_m0=np.nonzero(As['Aif'].sum(axis=1))[0]
+
+    invAee=lu_inv4(As['Aee'],ids_arestas_slin_m0)
+    M2=-invAee*As['Aev']
+    PAD=sp.vstack([M2,As['Ivv']])
+
+    invAff=lu_inv4(As['Aff'],ids_faces_slin_m0)
+    M3=-invAff*(As['Afe']*M2)
+    PAD=sp.vstack([M3,PAD])
+
+    invAii=lu_inv4(As['Aii'],ids_internos_slin_m0)
+    PAD=sp.vstack([-invAii*(As['Aif']*M3),PAD])
+
+    return PAD

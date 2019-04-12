@@ -21,7 +21,7 @@ def get_solution(T, b):
     return x
 
 Tf2 = sp.load_npz('Tf2.npz')
-OP1_AMS = sp.load_npz('OP1_AMS.npz')
+OP1_AMS = sp.load_npz('OP1_AMS.npz')                                                                                      
 OR1_AMS = sp.load_npz('OR1_AMS.npz')
 OP2_AMS = sp.load_npz('OP2_AMS.npz')
 OR2_AMS = sp.load_npz('OR2_AMS.npz')

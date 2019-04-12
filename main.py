@@ -1,5 +1,10 @@
 import os
 import yaml
+import shutil
+import sys
+
+deletar = True # deletar os arquivos gerados
+somente_deletar = False # deletar os arquivos e sair do script
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 input_dir = os.path.join(parent_dir, 'input')
@@ -7,6 +12,29 @@ flying_dir = os.path.join(parent_dir, 'flying')
 utils_dir = os.path.join(parent_dir, 'utils')
 preprocessor_dir = os.path.join(parent_dir, 'preprocessor')
 processor_dir = os.path.join(parent_dir, 'processor')
+output_dir = os.path.join(parent_dir, 'output')
+
+if deletar:
+    ### deletar arquivos no flying
+    bifasico_dir = os.path.join(flying_dir, 'bifasico')
+    sol_direta = os.path.join(bifasico_dir, 'sol_direta')
+    sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
+    shutil.rmtree(sol_multi)
+    shutil.rmtree(sol_direta)
+    os.makedirs(sol_direta)
+    os.makedirs(sol_multi)
+
+    ### deletar arquivos no output
+    bifasico_dir = os.path.join(output_dir, 'bifasico')
+    sol_direta = os.path.join(bifasico_dir, 'sol_direta')
+    sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
+    shutil.rmtree(sol_multi)
+    shutil.rmtree(sol_direta)
+    os.makedirs(sol_direta)
+    os.makedirs(sol_multi)
+
+    if somente_deletar:
+        sys.exit(0)
 
 os.chdir(input_dir)
 with open("inputs.yaml", 'r') as stream:

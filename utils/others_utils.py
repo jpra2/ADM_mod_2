@@ -715,6 +715,7 @@ class OtherUtils:
         """
         M = matriz do scipy
         """
+        M = M.tocsc()
 
         L=M.shape[0]
         s=1000
@@ -776,7 +777,7 @@ class OtherUtils:
         inds_tf_mod = OtherUtils.get_tmod_by_inds(inds_tf_mod, wirebasket_numbers)
         Tf_mod = sp.lil_matrix(tuple(inds_tf_mod[3]))
         Tf_mod[inds_tf_mod[0], inds_tf_mod[1]] = inds_tf_mod[2]
-        OP2_AMS = prol_tpfa.get_op_AMS_TPFA(Tf_mod, wirebasket_numbers).tocsc()
+        OP2_AMS = prol_tpfa.get_op_AMS_TPFA_dep(Tf_mod, wirebasket_numbers).tocsc()
 
         return OP2_AMS
 
@@ -785,3 +786,49 @@ class OtherUtils:
         T = T.tocsc()
         x = linalg.spsolve(T, b)
         return x
+
+    @staticmethod
+    def get_Tmod_by_sparse_wirebasket_matrix(Tf_wire, wirebasket_numbers):
+
+        Tmod = Tf_wire.copy().tolil()
+        ni = wirebasket_numbers[0]
+        nf = wirebasket_numbers[1]
+        ne = wirebasket_numbers[2]
+        nv = wirebasket_numbers[3]
+
+        nni = wirebasket_numbers[0]
+        nnf = wirebasket_numbers[1] + nni
+        nne = wirebasket_numbers[2] + nnf
+        nnv = wirebasket_numbers[3] + nne
+
+        #internos
+        Aii = Tmod[0:nni, 0:nni]
+        Aif = Tmod[0:nni, nni:nnf]
+
+        #faces
+        Aff = Tmod[nni:nnf, nni:nnf]
+        Afe = Tmod[nni:nnf, nnf:nne]
+        soma = Aif.transpose().sum(axis=1)
+        d1 = np.matrix(Aff.diagonal()).reshape([nf, 1])
+        d1 += soma
+        Aff.setdiag(d1)
+
+        #arestas
+        Aee = Tmod[nnf:nne, nnf:nne]
+        Aev = Tmod[nnf:nne, nne:nnv]
+        soma = Afe.transpose().sum(axis=1)
+        d1 = np.matrix(Aee.diagonal()).reshape([ne, 1])
+        d1 += soma
+        Aee.setdiag(d1)
+        Ivv = sp.identity(nv)
+
+        As = {}
+        As['Aii'] = Aii
+        As['Aif'] = Aif
+        As['Aff'] = Aff
+        As['Afe'] = Afe
+        As['Aee'] = Aee
+        As['Aev'] = Aev
+        As['Ivv'] = Ivv
+
+        return As
