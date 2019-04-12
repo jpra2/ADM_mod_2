@@ -151,7 +151,9 @@ def load_adm_mesh():
 
     os.chdir(input_dir)
     with open("inputs.yaml", 'r') as stream:
-        data_loaded = yaml.load(stream)
+        # data_loaded = yaml.load(stream)
+        data_loaded = yaml.load(stream, Loader=yaml.FullLoader)
+        # data_loaded = yaml.full_load(stream)
 
     input_file = data_loaded['input_file']
     ext_h5m_adm = input_file + '_malha_adm.h5m'

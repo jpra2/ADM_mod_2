@@ -26,7 +26,7 @@ class malha_adm:
         self.tags = {}
         self.tags['finos'] = mb.tag_get_handle('finos')
         self.tags['intermediarios'] = mb.tag_get_handle('intermediarios')
-        self.tags['ID_reord_tag'] = mb.tag_get_handle('ID_reord_tag')
+        self.tags['ID_reord_tag '] = mb.tag_get_handle('ID_reord_tag')
         self.tags['l1_ID'] = mb.tag_get_handle('l1_ID')
         self.tags['l2_ID'] = mb.tag_get_handle('l2_ID')
         self.tags['l3_ID'] = mb.tag_get_handle('l3_ID')
@@ -38,7 +38,7 @@ class malha_adm:
 
         L2_meshset = self.L2_meshset
         finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
-        finos = mb.get_entities_by_handle(finos)
+        finos = list(mb.get_entities_by_handle(finos))
         intermediarios = self.intermediarios
         ######################################################################
         # ni = ID do elemento no nível i
@@ -74,6 +74,7 @@ class malha_adm:
                         # elem_tags = self.mb.tag_get_tags_on_entity(elem)
                         # elem_Global_ID = self.mb.tag_get_data(elem_tags[0], elem, flat=True)
                         finos.append(elem)
+                        # finos = rng.unite(finos, rng.Range(elem))
 
             if tem_poço_no_vizinho:
                 for m1 in meshset_by_L1:

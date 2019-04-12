@@ -180,7 +180,7 @@ class bifasico:
         self.mb.tag_set_data(self.lbt_tag, all_volumes, all_lbt)
         self.mb.tag_set_data(self.fw_tag, all_volumes, all_fw)
 
-    def set_mobi_faces_ini_dep0(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         all_lbt = self.mb.tag_get_data(self.lbt_tag, all_volumes, flat=True)
@@ -234,7 +234,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini_v2(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
@@ -294,7 +294,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces_dep0(self, volumes, faces, finos0=None):
+    def set_mobi_faces(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -302,7 +302,7 @@ class bifasico:
         seta a mobilidade nas faces uma vez calculada a pressao corrigida
         """
         finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        lim_sat = 0.01
+        lim_sat = 0.15
         finos = self.mb.create_meshset()
         self.mb.tag_set_data(self.finos_tag, 0, finos)
         if finos0 == None:
@@ -369,7 +369,7 @@ class bifasico:
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
-    def set_mobi_faces(self, volumes, faces, finos0=None):
+    def set_mobi_faces_v2(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -722,11 +722,11 @@ class bifasico:
                 # sat = 0.8
                 return True
 
-            elif sat > sat1 + 0.2:
-                print('sat > sat1')
-                print(f'sat: {sat}')
-                print(f'sat1: {sat1}\n')
-                return True
+            # elif sat > sat1 + 0.2:
+            #     print('sat > sat1')
+            #     print(f'sat: {sat}')
+            #     print(f'sat1: {sat1}\n')
+            #     return True
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:

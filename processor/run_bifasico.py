@@ -228,10 +228,10 @@ def run_PMS(n1_adm, n2_adm, loop):
 
     Tf2 = As['Tf'].copy()
     Tf2 = Tf2.tolil()
-    # Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
-    Tf2, b = oth.set_boundary_dirichlet_matrix_v02(ids_volumes_d, vals_d, s_grav, Tf2)
-    # b = oth.set_boundary_neumann(map_global, map_values_n, b)
-    b = oth.set_boundary_neumann_v02(ids_volumes_n, vals_n, b)
+    Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
+    # Tf2, b = oth.set_boundary_dirichlet_matrix_v02(ids_volumes_d, vals_d, s_grav, Tf2)
+    b = oth.set_boundary_neumann(map_global, map_values_n, b)
+    # b = oth.set_boundary_neumann_v02(ids_volumes_n, vals_n, b)
 
 
     T1_ADM = OR1_ADM.dot(Tf2)
@@ -256,8 +256,8 @@ def run_PMS(n1_adm, n2_adm, loop):
     b2_ADM = OR2_ADM.dot(b1_ADM)
     T2_ADM = T2_ADM.tocsc()
 
-    # PC2_ADM = oth.get_solution(T2_ADM, b2_ADM)
-    PC2_ADM = oth.get_solution_gmres_scipy(T2_ADM, b2_ADM)
+    PC2_ADM = oth.get_solution(T2_ADM, b2_ADM)
+    # PC2_ADM = oth.get_solution_gmres_scipy(T2_ADM, b2_ADM)
     Pms2 = OP2_ADM.dot(PC2_ADM)
     Pms2 = OP1_ADM.dot(Pms2)
     mb.tag_set_data(tags_1['PMS2'], sol_adm.wirebasket_elems, Pms2)
