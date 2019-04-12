@@ -4,5 +4,8 @@
 *.dat
 *.h5m
 *.vtk
+*.msh
+
 
 *As.yaml
+*gmsh
