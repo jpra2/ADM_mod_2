@@ -75,15 +75,6 @@ boundary_faces_nv3 = mb.get_entities_by_handle(mb.tag_get_data(mb.tag_get_handle
 bound_faces_nv = [boundary_faces_nv2, boundary_faces_nv3]
 wirebasket_numbers = [sol_adm.ni, sol_adm.nf, sol_adm.na, sol_adm.nv]
 wirebasket_numbers_nv1 = [sol_adm.nint, sol_adm.nfac, sol_adm.nare, sol_adm.nver]
-<<<<<<< HEAD
-map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)))
-map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)))
-ids_volumes_d = mb.tag_get_data(tags_1['ID_reord_tag'], sol_adm.volumes_d, flat=True)
-vals_d  = mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)
-ids_volumes_n = mb.tag_get_data(tags_1['ID_reord_tag'], sol_adm.volumes_n, flat=True)
-vals_n  = mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)
-=======
->>>>>>> teste
 meshset_vertices = mb.create_meshset()
 mb.add_entities(meshset_vertices, sol_adm.vertices)
 meshset_vertices_nv2 = mb.create_meshset()
