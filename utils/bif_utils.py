@@ -1043,9 +1043,63 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def calculate_pcorr_v3(self, mb, Tf_orig, pms_tag, p_corr_tag, faces_boundary_nv1, vertices, tags):
+    def calculate_pcorr_v3(self, mb, Tf_orig, pms_tag, p_corr_tag, faces_boundary_nv1, vertices, tags, all_volumes):
         # TODO: fazer desacoplamento para pressão corrigida
-        pass
+        n = len(all_volumes)
+
+        Adjs = np.array([np.array(self.mb.get_adjacencies(face, 3)) for face in faces_boundary_nv1])
+        elems0 = Adjs[:,0]
+        elems1 = Adjs[:,1]
+        if self.gravity:
+            s_grav_faces = self.mb.tag_get_data(tags['S_GRAV'], faces_boundary_nv1, flat=True)
+        else:
+            s_grav_faces = np.zeros(len(faces_boundary_nv1))
+        presc = self.mb.tag_get_data(pms_tag, vertices, flat=True)
+        pms0 = self.mb.tag_get_data(pms_tag, elems0, flat=True)
+        pms1 = self.mb.tag_get_data(pms_tag, elems1, flat=True)
+        mobi_in_faces_boundary = self.mb.tag_get_data(self.mobi_in_faces_tag, faces_boundary_nv1, flat=True)
+        flux = (pms1 - pms0)*mobi_in_faces_boundary + s_grav_faces
+
+        ids_globais = self.mb.tag_get_data(tags['ID_reordenado_tag'], all_volumes, flat=True)
+        ids_nos_primais = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], all_volumes, flat=True)
+        ids_vertices = self.mb.tag_get_data(tags['ID_reordenado_tag'], vertices, flat=True)
+
+        map_ids_globais = dict(zip(all_volumes, ids_globais))
+        ids_elems0 = self.mb.tag_get_data(tags_1['ID_reordenado_tag'], elems0, flat=True)
+        ids_elems1 = self.mb.tag_get_data(tags_1['ID_reordenado_tag'], elems1, flat=True)
+        Tf = Tf_orig.copy()
+        Tf = Tf.tolil()
+        Tf[ids_elems0, ids_elems1] = np.zeros(len(ids_elems0))
+        Tf[ids_elems1, ids_elems0] = np.zeros(len(ids_elems0))
+        Tf[ids_vertices] = sp.lil_matrix((len(ids_vertices), n))
+        Tf[ids_vertices] = np.ones(len(vertices))
+        b = np.zeros(len(all_volumes))
+        b[ids_elems0] += flux
+        b[ids_elems1] -= flux
+        b[ids_vertices] = presc
+
+        G = sp.csc_matrix(np.ones(len(all_volumes)), (ids_nos_primais, ids_globais), shape=(n, n))
+        b = G.dot(b)
+        Tf = G.dot(Tf)
+        Tf = Tf.dot(G.transpose())
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
