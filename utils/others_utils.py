@@ -457,9 +457,6 @@ class OtherUtils:
         ks = np.load('spe10_perms_and_phi.npz')['perms']
         phi = np.load('spe10_perms_and_phi.npz')['phi']
 
-        return ks, phi
-
-
         # gid1 = [0, 0, 50]
         # gid2 = [gid1[0] + self.nx-1, gid1[1] + self.ny-1, gid1[2] + self.nz-1]
         #
@@ -495,6 +492,8 @@ class OtherUtils:
         #     gid = self.mb.tag_get_data(self.global_id_tag, volume, flat=True)
         #     perm = self.mb.tag_get_data(self.perm_tag, volume).reshape([3,3])
         #     fi2 = self.mb.tag_get_data(self.fi_tag, volume, flat = True)[0]
+
+        return ks, phi
 
     @staticmethod
     def fine_transmissibility_structured(mb, mtu, map_global, faces_in=None):

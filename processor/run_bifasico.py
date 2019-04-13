@@ -87,6 +87,10 @@ tags_1['ERRO1'] = mb.tag_get_handle('ERRO1', 1, types.MB_TYPE_DOUBLE, types.MB_T
 tags_1['ERRO2'] = mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
+utpy.enumerar_volumes_nivel_1(mb, meshsets_nv1)
+tags_1['IDS_NA_PRIMAL'] = mb.tag_get_handle('IDS_NA_PRIMAL')
+
 
 ####apagar
 mi = 0.0003

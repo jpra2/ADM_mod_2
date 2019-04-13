@@ -151,8 +151,8 @@ def load_adm_mesh():
 
     os.chdir(input_dir)
     with open("inputs.yaml", 'r') as stream:
-        # data_loaded = yaml.load(stream)
-        data_loaded = yaml.load(stream, Loader=yaml.FullLoader)
+        data_loaded = yaml.load(stream)
+        # data_loaded = yaml.load(stream, Loader=yaml.FullLoader)
         # data_loaded = yaml.full_load(stream)
 
     input_file = data_loaded['input_file']
@@ -174,3 +174,15 @@ def load_adm_mesh():
     os.chdir(parent_dir)
 
     return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded
+
+def enumerar_volumes_nivel_1(mb, meshsets_nv1):
+    ids_na_primal_tag = mb.tag_get_handle('IDS_NA_PRIMAL', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+
+    cont = 0
+    for m in meshsets_nv1:
+        elems = mb.get_entities_by_handle(m)
+        n = len(elems)
+        num1 = cont
+        num2 = num1 + n
+        mb.tag_set_data(ids_na_primal_tag, elems, np.arange(num1, num2))
+        cont += n

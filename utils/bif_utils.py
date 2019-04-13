@@ -1043,6 +1043,13 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
+    def calculate_pcorr_v3(self, mb, Tf_orig, pms_tag, p_corr_tag, faces_boundary_nv1, vertices, tags):
+        # TODO: fazer desacoplamento para pressão corrigida
+        pass
+
+
+
+
     def get_hist_ms(self, t, dt):
 
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
