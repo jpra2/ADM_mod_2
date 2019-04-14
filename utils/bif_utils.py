@@ -7,6 +7,7 @@ import yaml
 import scipy.sparse as sp
 import time
 from processor import conversao as conv
+from utils.others_utils import OtherUtils as oth
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -18,8 +19,8 @@ bifasico_dir = os.path.join(flying_dir, 'bifasico')
 fly_bif_mult_dir = os.path.join(bifasico_dir, 'sol_multiescala')
 
 import importlib.machinery
-loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
-oth = loader.load_module('others_utils').OtherUtils
+# loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
+# oth = loader.load_module('others_utils').OtherUtils
 
 # mi_w = 1.0
 # mi_o = 1.2
@@ -1043,47 +1044,119 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def calculate_pcorr_v3(self, mb, Tf_orig, pms_tag, p_corr_tag, faces_boundary_nv1, vertices, tags, all_volumes):
+    def calculate_pcorr_v3(self, mb, faces_boundary_nv1, pms_tag, p_corr_tag, vertices, tags, all_volumes):
         # TODO: fazer desacoplamento para pressão corrigida
         n = len(all_volumes)
+        meshsets_nv1 = self.mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags['PRIMAL_ID_1']]), np.array([None]))
+        ids_globais = self.mb.tag_get_data(tags['ID_reord_tag'], all_volumes, flat=True)
+        map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
+        pmss = self.mb.tag_get_data(pms_tag, all_volumes, flat=True)
 
-        Adjs = np.array([np.array(self.mb.get_adjacencies(face, 3)) for face in faces_boundary_nv1])
-        elems0 = Adjs[:,0]
-        elems1 = Adjs[:,1]
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in faces_boundary_nv1]
         if self.gravity:
             s_grav_faces = self.mb.tag_get_data(tags['S_GRAV'], faces_boundary_nv1, flat=True)
         else:
             s_grav_faces = np.zeros(len(faces_boundary_nv1))
+        ids_vertices = self.mb.tag_get_data(tags['ID_reord_tag'], vertices, flat=True)
         presc = self.mb.tag_get_data(pms_tag, vertices, flat=True)
-        pms0 = self.mb.tag_get_data(pms_tag, elems0, flat=True)
-        pms1 = self.mb.tag_get_data(pms_tag, elems1, flat=True)
-        mobi_in_faces_boundary = self.mb.tag_get_data(self.mobi_in_faces_tag, faces_boundary_nv1, flat=True)
-        flux = (pms1 - pms0)*mobi_in_faces_boundary + s_grav_faces
+        map_presc = dict(zip(vertices, presc))
+        # pms0 = self.mb.tag_get_data(pms_tag, elems0, flat=True)
+        # pms1 = self.mb.tag_get_data(pms_tag, elems1, flat=True)
+        # ids_elems0 = self.mb.tag_get_data(tags['ID_reord_tag'], elems0, flat=True)
+        # ids_elems1 = self.mb.tag_get_data(tags['ID_reord_tag'], elems1, flat=True)
 
-        ids_globais = self.mb.tag_get_data(tags['ID_reordenado_tag'], all_volumes, flat=True)
-        ids_nos_primais = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], all_volumes, flat=True)
-        ids_vertices = self.mb.tag_get_data(tags['ID_reordenado_tag'], vertices, flat=True)
+        # mobis_in_faces_boundary = self.Tf[ids_elems0, ids_elems1].todense()
+        # mobis_in_faces_boundary = self.mb.tag_get_data(self.mobi_in_faces_tag, faces_boundary_nv1, flat=True)
+        # flux = (pms1 - pms0)*np.absolute(mobis_in_faces_boundary) + s_grav_faces
 
-        map_ids_globais = dict(zip(all_volumes, ids_globais))
-        ids_elems0 = self.mb.tag_get_data(tags_1['ID_reordenado_tag'], elems0, flat=True)
-        ids_elems1 = self.mb.tag_get_data(tags_1['ID_reordenado_tag'], elems1, flat=True)
-        Tf = Tf_orig.copy()
+        Tf = self.Tf.copy()
         Tf = Tf.tolil()
+
+        ids_nos_primais = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], all_volumes, flat=True)
+        ids_elems0 = []
+        ids_elems1 = []
+        mobis2 = []
+        fluxs = []
+
+        for i, face in enumerate(faces_boundary_nv1):
+            elem0 = Adjs[i][0]
+            elem1 = Adjs[i][1]
+            id0 = ids_globais[map_volumes[elem0]]
+            id1 = ids_globais[map_volumes[elem1]]
+            mobi = Tf[id0, id1]
+            ids_elems0.append(id0)
+            ids_elems1.append(id1)
+            mobis2.append(mobi)
+            flux = (pmss[id1] - pmss[id0])*abs(mobi) + s_grav_faces[i]
+            fluxs.append(flux)
+
+        Tf[ids_elems0, ids_elems0] += np.array([mobis2])
+        Tf[ids_elems1, ids_elems1] += np.array([mobis2])
         Tf[ids_elems0, ids_elems1] = np.zeros(len(ids_elems0))
         Tf[ids_elems1, ids_elems0] = np.zeros(len(ids_elems0))
         Tf[ids_vertices] = sp.lil_matrix((len(ids_vertices), n))
-        Tf[ids_vertices] = np.ones(len(vertices))
+        Tf[ids_vertices, ids_vertices] = np.ones(len(vertices))
+
+        indices = sp.find(Tf)
+        lines = indices[0]
+        cols = indices[1]
+        vals = indices[2]
+        map_ids_globais_in_primais = dict(zip(ids_globais, ids_nos_primais))
+        lines2 = [map_ids_globais_in_primais[i] for i in lines]
+        cols2 = [map_ids_globais_in_primais[i] for i in cols]
+        Tf2 = sp.csc_matrix((vals, (lines2, cols2)), shape=(n, n))
+
+        cc = 0
+        for i in range(Tf2.shape[0]):
+            print(Tf2[i])
+            print(Tf2[i].sum())
+            print('\n')
+            cc += 1
+            if cc == 10:
+                cc = 0
+                import pdb; pdb.set_trace()
+
         b = np.zeros(len(all_volumes))
         b[ids_elems0] += flux
         b[ids_elems1] -= flux
         b[ids_vertices] = presc
+        #
+        # G = sp.csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
+        # G = sp.csc_matrix((np.ones(len(all_volumes)), (ids_nos_primais, ids_globais)), shape=(n, n))
+        # Gt = G.transpose()
+        # b = G.dot(b)
+        # Tf = G.dot(Tf)
+        # Tf = Tf.dot(Gt)
+        # resp = np.zeros(len(all_volumes))
+        # cont = 0
+        #
+        # for m in meshsets_nv1:
+        #     cont += 1
+        #     elems = self.mb.get_entities_by_handle(m)
+        #     level = np.unique(self.mb.tag_get_data(tags['l3_ID'], elems, flat=True))[0]
+        #     if level == 1:
+        #         continue
+        #     import pdb; pdb.set_trace()
+        #     ids = [map_volumes[v] for v in elems]
+        #     ids_glob = ids_globais[ids]
+        #     ids_primal = ids_nos_primais[ids]
+        #
+        #
+        #     tt = Tf[idsl.min():idsl.max()+1, idsl.min():idsl.max()+1]
+        #     for i in range(tt.shape[0]):
+        #         print(tt[i])
+        #         print(tt[i].sum())
+        #         print('\n')
+        #     import pdb; pdb.set_trace()
+        #     b2 = b[idsl]
+        #
+        #     resp[idsl] = oth.get_solution(tt, b2)
 
-        G = sp.csc_matrix(np.ones(len(all_volumes)), (ids_nos_primais, ids_globais), shape=(n, n))
-        b = G.dot(b)
-        Tf = G.dot(Tf)
-        Tf = Tf.dot(G.transpose())
 
-        
+
+
+
+
 
 
 

@@ -88,6 +88,7 @@ tags_1['ERRO2'] = mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_T
 tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
+meshsets_nv2 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_2']]), np.array([None]))
 utpy.enumerar_volumes_nivel_1(mb, meshsets_nv1)
 tags_1['IDS_NA_PRIMAL'] = mb.tag_get_handle('IDS_NA_PRIMAL')
 
@@ -166,6 +167,8 @@ map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.
 map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)))
 
 finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
+# meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
+
 
 # import pdb; pdb.set_trace()
 
@@ -231,6 +234,7 @@ def run_PMS(n1_adm, n2_adm, loop):
 
 
     Tf2 = As['Tf'].copy()
+    bif_utils.Tf = Tf2
     Tf2 = Tf2.tolil()
     Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
     # Tf2, b = oth.set_boundary_dirichlet_matrix_v02(ids_volumes_d, vals_d, s_grav, Tf2)
@@ -243,10 +247,10 @@ def run_PMS(n1_adm, n2_adm, loop):
     b1_ADM = OR1_ADM.dot(b)
     T1_ADM = T1_ADM.tocsc()
 
-    PC1_ADM = oth.get_solution(T1_ADM, b1_ADM)
-    # PC1_ADM = oth.get_solution_gmres_scipy(T1_ADM, b1_ADM)
-    Pms1 = OP1_ADM.dot(PC1_ADM)
-    mb.tag_set_data(tags_1['PMS1'], sol_adm.wirebasket_elems, Pms1)
+    # PC1_ADM = oth.get_solution(T1_ADM, b1_ADM)
+    # # PC1_ADM = oth.get_solution_gmres_scipy(T1_ADM, b1_ADM)
+    # Pms1 = OP1_ADM.dot(PC1_ADM)
+    # mb.tag_set_data(tags_1['PMS1'], sol_adm.wirebasket_elems, Pms1)
 
     # Tf2 = Tf2.tocsc()
     # Pf = oth.get_solution(Tf2, b)
@@ -339,6 +343,17 @@ def run_2(t):
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)
     print('saiu run2')
+
+def run_2_v2(t):
+    print('entrou run2')
+    t0 = time.time()
+    elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
+    vertices_nv1 = mb.get_entities_by_type_and_tag(meshset_vertices, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([2]))
+    bif_utils.calculate_pcorr(mb, bound_faces_nv[0], tags_1['PMS2'], tags_1['PCORR2'], vertices_nv1, tags_1, all_volumes)
+
+
+
+
 
 def run_3(loop):
     print('entrou run3')
