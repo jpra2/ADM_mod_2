@@ -115,6 +115,35 @@ class bifasico:
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
 
+    def calc_cfl_v2(self, all_faces_in):
+        """
+        cfl usando fluxo maximo
+        """
+        self.cfl = self.cfl_ini
+        self.all_faces_in = all_faces_in
+        qs = self.mb.tag_get_data(self.flux_in_faces_tag, all_faces_in, flat=True)
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        all_volumes = self.mtu.get_bridge_adjacencies(all_faces_in, 2, 3)
+        delta_ts = np.zeros(len(all_volumes))
+        faces_volumes = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in all_volumes]
+        dfdss = self.mb.tag_get_data(self.dfds_tag, all_faces_in, flat=True)
+        map_faces = dict(zip(all_faces_in, range(len(all_faces_in))))
+
+        for i, v in enumerate(all_volumes):
+            faces = faces_volumes[i]
+            ids_faces = [map_faces[f] for f in faces]
+            q_faces = qs[ids_faces]
+            qm = max(q_faces)
+
+
+
+        self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
+        self.flux_total_producao = self.flux_total_prod
+
+        self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+        # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        # self.vpi += vpi
+
     def rec_cfl(self, cfl):
         cfl = 0.5*cfl
         print('novo cfl', cfl)
