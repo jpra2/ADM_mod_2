@@ -1100,12 +1100,15 @@ class bifasico:
 
         Tf = self.Tf.copy()
         Tf = Tf.tolil()
+        b = np.zeros(len(all_volumes))
 
         ids_nos_primais = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], all_volumes, flat=True)
         ids_elems0 = []
         ids_elems1 = []
         mobis2 = []
         fluxs = []
+        map_ids_globais_in_primais = dict(zip(ids_globais, ids_nos_primais))
+        map_ids_primais_in_globais = dict(zip(ids_nos_primais, ids_globais))
 
         for i, face in enumerate(faces_boundary_nv1):
             elem0 = Adjs[i][0]
@@ -1113,73 +1116,64 @@ class bifasico:
             id0 = ids_globais[map_volumes[elem0]]
             id1 = ids_globais[map_volumes[elem1]]
             mobi = Tf[id0, id1]
-            ids_elems0.append(id0)
-            ids_elems1.append(id1)
-            mobis2.append(mobi)
+            Tf[id0, id1] = 0
+            Tf[id1, id0] = 0
+            Tf[id0, id0] += mobi
+            Tf[id1, id1] += mobi
+            # mobis2.append(mobi)
             flux = (pmss[id1] - pmss[id0])*abs(mobi) + s_grav_faces[i]
-            fluxs.append(flux)
+            b[id0] += flux
+            b[id1] -= flux
 
-        Tf[ids_elems0, ids_elems0] += np.array([mobis2])
-        Tf[ids_elems1, ids_elems1] += np.array([mobis2])
-        Tf[ids_elems0, ids_elems1] = np.zeros(len(ids_elems0))
-        Tf[ids_elems1, ids_elems0] = np.zeros(len(ids_elems0))
+        #
+        # Tf[ids_elems0, ids_elems0] += np.array([mobis2])
+        # Tf[ids_elems1, ids_elems1] += np.array([mobis2])
+        # Tf[ids_elems0, ids_elems1] = np.zeros(len(ids_elems0))
+        # Tf[ids_elems1, ids_elems0] = np.zeros(len(ids_elems1))
         Tf[ids_vertices] = sp.lil_matrix((len(ids_vertices), n))
         Tf[ids_vertices, ids_vertices] = np.ones(len(vertices))
-
-        indices = sp.find(Tf)
-        lines = indices[0]
-        cols = indices[1]
-        vals = indices[2]
-        map_ids_globais_in_primais = dict(zip(ids_globais, ids_nos_primais))
-        lines2 = [map_ids_globais_in_primais[i] for i in lines]
-        cols2 = [map_ids_globais_in_primais[i] for i in cols]
-        Tf2 = sp.csc_matrix((vals, (lines2, cols2)), shape=(n, n))
-
-        cc = 0
-        for i in range(Tf2.shape[0]):
-            print(Tf2[i])
-            print(Tf2[i].sum())
-            print('\n')
-            cc += 1
-            if cc == 10:
-                cc = 0
-                import pdb; pdb.set_trace()
-
-        b = np.zeros(len(all_volumes))
-        b[ids_elems0] += flux
-        b[ids_elems1] -= flux
         b[ids_vertices] = presc
+
+        # sol = oth.get_solution(Tf, b)
+
+
+        # indices = sp.find(Tf)
+        # lines = indices[0]
+        # cols = indices[1]
+        # vals = indices[2]
+        # map_ids_globais_in_primais = dict(zip(ids_globais, ids_nos_primais))
+        # lines2 = [map_ids_globais_in_primais[i] for i in lines]
+        # cols2 = [map_ids_globais_in_primais[i] for i in cols]
+        # Tf2 = sp.csc_matrix((vals, (lines2, cols2)), shape=(n, n))
+
         #
         # G = sp.csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
-        # G = sp.csc_matrix((np.ones(len(all_volumes)), (ids_nos_primais, ids_globais)), shape=(n, n))
-        # Gt = G.transpose()
-        # b = G.dot(b)
-        # Tf = G.dot(Tf)
-        # Tf = Tf.dot(Gt)
-        # resp = np.zeros(len(all_volumes))
-        # cont = 0
-        #
-        # for m in meshsets_nv1:
-        #     cont += 1
-        #     elems = self.mb.get_entities_by_handle(m)
-        #     level = np.unique(self.mb.tag_get_data(tags['l3_ID'], elems, flat=True))[0]
-        #     if level == 1:
-        #         continue
-        #     import pdb; pdb.set_trace()
-        #     ids = [map_volumes[v] for v in elems]
-        #     ids_glob = ids_globais[ids]
-        #     ids_primal = ids_nos_primais[ids]
-        #
-        #
-        #     tt = Tf[idsl.min():idsl.max()+1, idsl.min():idsl.max()+1]
-        #     for i in range(tt.shape[0]):
-        #         print(tt[i])
-        #         print(tt[i].sum())
-        #         print('\n')
-        #     import pdb; pdb.set_trace()
-        #     b2 = b[idsl]
-        #
-        #     resp[idsl] = oth.get_solution(tt, b2)
+        G = sp.csc_matrix((np.ones(len(all_volumes)), (ids_nos_primais, ids_globais)), shape=(n, n))
+        Gt = G.transpose()
+        b0 = b.copy()
+        b = G.dot(b)
+        Tf = G.dot(Tf)
+        Tf = Tf.dot(Gt)
+        resp = np.zeros(len(all_volumes))
+
+        cont = 0
+
+        for m in meshsets_nv1:
+            cont += 1
+            elems = self.mb.get_entities_by_handle(m)
+            level = np.unique(self.mb.tag_get_data(tags['l3_ID'], elems, flat=True))[0]
+            if level == 1:
+                continue
+            ids = [map_volumes[v] for v in elems]
+            ids_glob = ids_globais[ids]
+            ids_primal = ids_nos_primais[ids]
+            idsl = ids_primal
+            tt = Tf[idsl.min():idsl.max()+1, idsl.min():idsl.max()+1]
+            b2 = b[idsl]
+            resp[idsl] = oth.get_solution(tt, b2)
+
+        resp = Gt.dot(resp)
+        self.mb.tag_set_data(p_corr_tag, all_volumes, resp)
 
 
 

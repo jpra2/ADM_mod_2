@@ -94,12 +94,14 @@ tags_1['IDS_NA_PRIMAL'] = mb.tag_get_handle('IDS_NA_PRIMAL')
 
 
 ####apagar
-mi = 0.0003
-# mi = 1.0
+# mi = 0.0003
+mi = 1.0
 bif_utils.mi_w = mi #Paxs
-bif_utils.mi_o = 2*mi
+bif_utils.mi_o = mi
 bif_utils.set_sat_in(all_volumes)
 bif_utils.set_lamb(all_volumes)
+# kk = 1e-30
+# k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
 for v in all_volumes:
 
     k = mb.tag_get_data(tags_1['PERM'], v, flat=True)
@@ -350,6 +352,8 @@ def run_2_v2(t):
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
     vertices_nv1 = mb.get_entities_by_type_and_tag(meshset_vertices, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([2]))
     bif_utils.calculate_pcorr(mb, bound_faces_nv[0], tags_1['PMS2'], tags_1['PCORR2'], vertices_nv1, tags_1, all_volumes)
+    mb.write_file('exemplo.vtk', [vv])
+    import pdb; pdb.set_trace()
 
 
 
