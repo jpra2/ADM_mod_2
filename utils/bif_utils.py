@@ -38,6 +38,7 @@ import importlib.machinery
 class bifasico:
     def __init__(self, mb, mtu, all_volumes):
         self.cfl_ini = 0.9
+        self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
         self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
         self.mi_o = mb.tag_get_data(mb.tag_get_handle('MI_O'), 0, flat=True)[0]
@@ -87,9 +88,9 @@ class bifasico:
         mins = coords.min(axis=0)
         hs = maxs - mins
         # converter pe para metro
-        hs[0] = conv.pe_to_m(hs[0])
-        hs[1] = conv.pe_to_m(hs[1])
-        hs[1] = conv.pe_to_m(hs[1])
+        # hs[0] = conv.pe_to_m(hs[0])
+        # hs[1] = conv.pe_to_m(hs[1])
+        # hs[1] = conv.pe_to_m(hs[1])
 
         self.hs = hs
         vol = hs[0]*hs[1]*hs[2]
@@ -101,7 +102,7 @@ class bifasico:
         self.V_total = float((self.V_total*mb.tag_get_data(self.phi_tag, all_volumes, flat=True)).sum())
         self.vpi = 0.0
 
-    def calc_cfl(self, all_faces_in):
+    def calc_cfl_dep0(self, all_faces_in):
         """
         cfl usando fluxo maximo
         """
@@ -115,36 +116,74 @@ class bifasico:
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
 
-    def calc_cfl_v2(self, all_faces_in):
+    def calc_cfl(self, all_faces_in):
         """
         cfl usando fluxo maximo
         """
+        lim_sup = 1e5
         self.cfl = self.cfl_ini
         self.all_faces_in = all_faces_in
         qs = self.mb.tag_get_data(self.flux_in_faces_tag, all_faces_in, flat=True)
+        dfdss = self.mb.tag_get_data(self.dfds_tag, all_faces_in, flat=True)
         Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
         all_volumes = self.mtu.get_bridge_adjacencies(all_faces_in, 2, 3)
         delta_ts = np.zeros(len(all_volumes))
         faces_volumes = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in all_volumes]
-        dfdss = self.mb.tag_get_data(self.dfds_tag, all_faces_in, flat=True)
+        phis = self.mb.tag_get_data(self.phi_tag, all_volumes, flat=True)
+        Vs = self.mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
         map_faces = dict(zip(all_faces_in, range(len(all_faces_in))))
 
+        # self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+
         for i, v in enumerate(all_volumes):
+            V = Vs[i]
+            phi = phis[i]
+            if phi == 0:
+                delta_ts[i] = lim_sup
+                continue
             faces = faces_volumes[i]
+            faces = rng.intersect(all_faces_in, faces)
             ids_faces = [map_faces[f] for f in faces]
             q_faces = qs[ids_faces]
-            qm = max(q_faces)
+            dfdss_faces = dfdss[ids_faces]
+            qmax = q_faces.max()
+            ind = np.where(q_faces == qmax)[0]
+            dfds = dfdss_faces[ind][0]
+            if dfds == 0.0:
+                dt1 = lim_sup
+            else:
+                qmax = abs(qmax)
+                dt1 = self.cfl*(phi*V)/float(qmax*dfds)
+                if dt1 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            dfds_max = dfdss_faces.max()
+            if dfds_max == 0:
+                dt2 = dt1
+            else:
+                ind = np.where(dfdss_faces == dfds_max)[0]
+                q2 = abs(q_faces[ind])
+                dt2 = self.cfl*(phi*V)/float(q2*dfds_max)
+                if dt2 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            delta_ts[i] = min([dt1, dt2])
+            if delta_ts[i] > self.delta_t_min:
+                delta_ts[i] = self.delta_t_min
 
 
-
+        self.delta_t = delta_ts.min()
         self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
         self.flux_total_producao = self.flux_total_prod
 
-        self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+        # self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
 
-    def rec_cfl(self, cfl):
+    def rec_cfl_dep0(self, cfl):
+
         cfl = 0.5*cfl
         print('novo cfl', cfl)
         qmax = np.absolute(self.mb.tag_get_data(self.flux_in_faces_tag, self.all_faces_in, flat=True)).max()
@@ -153,6 +192,72 @@ class bifasico:
         self.delta_t = cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
+        return cfl
+
+    def rec_cfl(self, cfl):
+
+        cfl = 0.5*cfl
+        self.cfl = cfl
+        print('novo cfl', cfl)
+        lim_sup = 1e5
+        qs = self.mb.tag_get_data(self.flux_in_faces_tag, self.all_faces_in, flat=True)
+        dfdss = self.mb.tag_get_data(self.dfds_tag, self.all_faces_in, flat=True)
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in self.all_faces_in]
+        all_volumes = self.mtu.get_bridge_adjacencies(self.all_faces_in, 2, 3)
+        delta_ts = np.zeros(len(all_volumes))
+        faces_volumes = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in all_volumes]
+        phis = self.mb.tag_get_data(self.phi_tag, all_volumes, flat=True)
+        Vs = self.mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
+        map_faces = dict(zip(self.all_faces_in, range(len(self.all_faces_in))))
+
+        # self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+
+        for i, v in enumerate(all_volumes):
+
+            V = Vs[i]
+            phi = phis[i]
+            if phi == 0:
+                delta_ts[i] = lim_sup
+                continue
+            faces = faces_volumes[i]
+            faces = rng.intersect(self.all_faces_in, faces)
+            ids_faces = [map_faces[f] for f in faces]
+            q_faces = qs[ids_faces]
+            dfdss_faces = dfdss[ids_faces]
+            qmax = q_faces.max()
+            ind = np.where(q_faces == qmax)[0]
+            dfds = dfdss_faces[ind][0]
+            if dfds == 0.0:
+                dt1 = lim_sup
+            else:
+                qmax = abs(qmax)
+                dt1 = self.cfl*(phi*V)/float(qmax*dfds)
+                if dt1 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            dfds_max = dfdss_faces.max()
+            if dfds_max == 0:
+                dt2 = dt1
+            else:
+                ind = np.where(dfdss_faces == dfds_max)[0]
+                q2 = abs(q_faces[ind])
+                dt2 = self.cfl*(phi*V)/float(q2*dfds_max)
+                if dt2 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            delta_ts[i] = min([dt1, dt2])
+            if delta_ts[i] > self.delta_t_min:
+                delta_ts[i] = self.delta_t_min
+
+
+        self.delta_t = delta_ts.min()
+        print(f'novo delta_t: {self.delta_t}')
+        print('\n')
+
+        self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
+        self.flux_total_producao = self.flux_total_prod
         return cfl
 
     def set_sat_in(self, all_volumes):
@@ -693,6 +798,7 @@ class bifasico:
         """
         calcula a saturacao do passo de tempo corrente
         """
+        delta_sat = 0.001
         t1 = time.time()
         lim = 1e-4
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
@@ -707,7 +813,7 @@ class bifasico:
             # gid = mb.tag_get_data(self.global_id_tag, volume, flat=True)[0]
             sat1 = all_sats[i]
             V = all_volumes[i]
-            if volume in self.wells_injector:
+            if volume in self.wells_injector or sat1 == 0.8:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
@@ -739,9 +845,12 @@ class bifasico:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat > 0.8:
+            if sat < 0.8 - delta_sat and sat > 0.8 + delta_sat:
+                sat = 0.8
+
+            elif sat > 0.8:
                 #sat = 1 - self.Sor
-                print("Sat > 1")
+                print("Sat > 0.8")
                 print(sat)
                 print('i')
                 print(i)
