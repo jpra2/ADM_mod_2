@@ -163,7 +163,7 @@ class bifasico:
                 dt2 = dt1
             else:
                 ind = np.where(dfdss_faces == dfds_max)[0]
-                q2 = abs(q_faces[ind])
+                q2 = abs(q_faces[ind][0])
                 dt2 = self.cfl*(phi*V)/float(q2*dfds_max)
                 if dt2 < 0:
                     print('erro')
@@ -241,7 +241,7 @@ class bifasico:
                 dt2 = dt1
             else:
                 ind = np.where(dfdss_faces == dfds_max)[0]
-                q2 = abs(q_faces[ind])
+                q2 = abs(q_faces[ind][0])
                 dt2 = self.cfl*(phi*V)/float(q2*dfds_max)
                 if dt2 < 0:
                     print('erro')
