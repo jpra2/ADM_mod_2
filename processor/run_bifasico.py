@@ -101,11 +101,11 @@ bif_utils.mi_o = mi
 bif_utils.set_sat_in(all_volumes)
 bif_utils.set_lamb(all_volumes)
 # kk = 1e-30
-# k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
 for v in all_volumes:
 
-    k = mb.tag_get_data(tags_1['PERM'], v, flat=True)
-    k = conv.milidarcy_to_m2(k)
+    # k = mb.tag_get_data(tags_1['PERM'], v, flat=True)
+    # k = conv.milidarcy_to_m2(k)
     mb.tag_set_data(tags_1['PERM'], v, k)
 
 def get_ls(all_volumes):
@@ -132,21 +132,22 @@ def set_keq(all_volumes, faces_in, tags):
     map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
     keqs = np.zeros(len(faces_in))
     for i, f in enumerate(faces_in):
-        elem0 = Adjs[i][0]
-        elem1 = Adjs[i][1]
-        id0 = map_volumes[elem0]
-        id1 = map_volumes[elem1]
-        direction = all_centroids[id1] - all_centroids[id0]
-        norma = np.linalg.norm(direction)
-        uni = np.absolute(direction/norma)
-        a = np.dot(uni, A)
-        k0 = all_ks[id0].reshape([3, 3])
-        k1 = all_ks[id1].reshape([3, 3])
-        k0 = np.dot(np.dot(k0, uni), uni)
-        k1 = np.dot(np.dot(k1, uni), uni)
-        kharm = 2*(k0*k1)/(k0 + k1)
-        keq = a*kharm/norma
-        keqs[i] = keq
+        # elem0 = Adjs[i][0]
+        # elem1 = Adjs[i][1]
+        # id0 = map_volumes[elem0]
+        # id1 = map_volumes[elem1]
+        # direction = all_centroids[id1] - all_centroids[id0]
+        # norma = np.linalg.norm(direction)
+        # uni = np.absolute(direction/norma)
+        # a = np.dot(uni, A)
+        # k0 = all_ks[id0].reshape([3, 3])
+        # k1 = all_ks[id1].reshape([3, 3])
+        # k0 = np.dot(np.dot(k0, uni), uni)
+        # k1 = np.dot(np.dot(k1, uni), uni)
+        # kharm = 2*(k0*k1)/(k0 + k1)
+        # keq = a*kharm/norma
+        # keqs[i] = keq
+        keqs[i] = 1.0
 
     mb.tag_set_data(tags['K_EQ'], faces_in, keqs)
 
@@ -155,14 +156,14 @@ set_keq(all_volumes, faces_in, tags_1)
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
 k01 = 1e-3
-vazao_inj = 5000*k01 #bbl/dia
-vazao_inj = conv.bbldia_to_m3seg(vazao_inj) #m3/s
-# vazao_inj = 10
+# vazao_inj = 5000*k01 #bbl/dia
+# vazao_inj = conv.bbldia_to_m3seg(vazao_inj) #m3/s
+vazao_inj = 1.0
 # vazao_inj = conv.bbldia_to_m3seg(vazao_inj) #m3/s
 mb.tag_set_data(tags_1['Q'], sol_adm.volumes_n, np.repeat(-1.0*vazao_inj, len(sol_adm.volumes_n)))
-press_prod = 4000 #psi
-press_prod = conv.psi_to_Pa(press_prod) #Pascal
-# press_prod = 100 #psi
+# press_prod = 4000 #psi
+# press_prod = conv.psi_to_Pa(press_prod) #Pascal
+press_prod = 1.0 #psi
 # press_prod = conv.psi_to_Pa(press_prod) #Pascal
 mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, np.repeat(press_prod, len(sol_adm.volumes_d)))
 map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)))
@@ -236,8 +237,9 @@ def run_PMS(n1_adm, n2_adm, loop):
 
 
     Tf2 = As['Tf'].copy()
-    bif_utils.Tf = Tf2
     Tf2 = Tf2.tolil()
+
+    bif_utils.Tf = Tf2
     Tf2, b = oth.set_boundary_dirichlet_matrix(map_global, map_values_d, s_grav, Tf2)
     # Tf2, b = oth.set_boundary_dirichlet_matrix_v02(ids_volumes_d, vals_d, s_grav, Tf2)
     b = oth.set_boundary_neumann(map_global, map_values_n, b)
@@ -282,7 +284,7 @@ def run_PMS(n1_adm, n2_adm, loop):
     dt = t1-t0
     # print(f'run pms {dt} \n')
 
-def run_2(t):
+def run_2_dep0(t):
     print('entrou run2')
     t0 = time.time()
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
@@ -346,12 +348,13 @@ def run_2(t):
     bif_utils.verificar_cfl(all_volumes, loop)
     print('saiu run2')
 
-def run_2_v2(t):
+def run_2(t):
     print('entrou run2')
     t0 = time.time()
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
-    vertices_nv1 = mb.get_entities_by_type_and_tag(meshset_vertices, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([2]))
-    bif_utils.calculate_pcorr(mb, bound_faces_nv[0], tags_1['PMS2'], tags_1['PCORR2'], vertices_nv1, tags_1, all_volumes)
+    vertices_nv1 = mb.get_entities_by_type_and_tag(meshset_vertices, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([0]))
+    vertices_nv1 = rng.subtract(mb.get_entities_by_handle(meshset_vertices), vertices_nv1)
+    bif_utils.calculate_pcorr_v3(mb, bound_faces_nv[0], tags_1['PMS2'], tags_1['PCORR2'], vertices_nv1, tags_1, all_volumes)
     mb.write_file('exemplo.vtk', [vv])
     import pdb; pdb.set_trace()
 

@@ -113,6 +113,7 @@ class bifasico:
         self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
         self.flux_total_producao = self.flux_total_prod
         self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+        # self.delta_t = self.cfl*(fi*V)/float(q*dfds)
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
 
@@ -1208,7 +1209,7 @@ class bifasico:
         # flux = (pms1 - pms0)*np.absolute(mobis_in_faces_boundary) + s_grav_faces
 
         Tf = self.Tf.copy()
-        Tf = Tf.tolil()
+        # Tf = Tf.tolil()
         b = np.zeros(len(all_volumes))
 
         ids_nos_primais = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], all_volumes, flat=True)
@@ -1224,15 +1225,18 @@ class bifasico:
             elem1 = Adjs[i][1]
             id0 = ids_globais[map_volumes[elem0]]
             id1 = ids_globais[map_volumes[elem1]]
+            # id0 = ids_globais[map_volumes[elem0]]
+            # id1 = ids_globais[map_volumes[elem1]]
             mobi = Tf[id0, id1]
             Tf[id0, id1] = 0
             Tf[id1, id0] = 0
             Tf[id0, id0] += mobi
             Tf[id1, id1] += mobi
             # mobis2.append(mobi)
-            flux = (pmss[id1] - pmss[id0])*abs(mobi) + s_grav_faces[i]
-            b[id0] += flux
-            b[id1] -= flux
+            # flux = (pmss[id1] - pmss[id0])*abs(mobi) + s_grav_faces[i]
+            flux = (pmss[map_volumes[elem1]] - pmss[map_volumes[elem0]])*abs(mobi) + s_grav_faces[i]
+            b[id0] -= flux
+            b[id1] += flux
 
         #
         # Tf[ids_elems0, ids_elems0] += np.array([mobis2])
@@ -1242,6 +1246,9 @@ class bifasico:
         Tf[ids_vertices] = sp.lil_matrix((len(ids_vertices), n))
         Tf[ids_vertices, ids_vertices] = np.ones(len(vertices))
         b[ids_vertices] = presc
+
+        # resp = oth.get_solution(Tf, b)
+        # self.mb.tag_set_data(p_corr_tag, all_volumes, resp)
 
         # sol = oth.get_solution(Tf, b)
 
@@ -1266,6 +1273,7 @@ class bifasico:
         resp = np.zeros(len(all_volumes))
 
         cont = 0
+        lim = 1e-14
 
         for m in meshsets_nv1:
             cont += 1
@@ -1273,40 +1281,28 @@ class bifasico:
             level = np.unique(self.mb.tag_get_data(tags['l3_ID'], elems, flat=True))[0]
             if level == 1:
                 continue
-            ids = [map_volumes[v] for v in elems]
-            ids_glob = ids_globais[ids]
-            ids_primal = ids_nos_primais[ids]
+            vert = rng.intersect(elems, vertices)
+            if level == 3:
+                import pdb; pdb.set_trace()
+            try:
+                val_vert = map_presc[vert[0]]
+            except:
+                import pdb; pdb.set_trace()
+
+            ids_glob = self.mb.tag_get_data(tags['ID_reord_tag'], elems, flat=True)
+            ids_primal = self.mb.tag_get_data(tags['IDS_NA_PRIMAL'], elems, flat=True)
             idsl = ids_primal
             tt = Tf[idsl.min():idsl.max()+1, idsl.min():idsl.max()+1]
             b2 = b[idsl]
-            resp[idsl] = oth.get_solution(tt, b2)
+            resp[ids_glob] = oth.get_solution(tt, b2)
 
-        resp = Gt.dot(resp)
+        v1 = np.arange(len(all_volumes))
+
+        G2 = sp.csc_matrix((np.ones(len(all_volumes)), (v1, ids_globais)), shape=(n, n))
+        resp = G2.dot(resp)
+
+        # resp = Gt.dot(resp)
         self.mb.tag_set_data(p_corr_tag, all_volumes, resp)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def get_hist_ms(self, t, dt):
