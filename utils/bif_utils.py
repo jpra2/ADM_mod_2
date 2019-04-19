@@ -1174,10 +1174,6 @@ class bifasico:
 
         level = np.unique(mb.tag_get_data(dict_tags['l3_ID'], elems_in_meshset, flat=True))
 
-        lim = 1e-12
-        if abs(b.sum()) > lim:
-            import pdb; pdb.set_trace()
-
         d_vols = rng.Range(vertice)
         map_values = dict(zip(d_vols, mb.tag_get_data(pms_tag, d_vols, flat=True)))
         T, b = oth.set_boundary_dirichlet_matrix(map_local, map_values, b, T)

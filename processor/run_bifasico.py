@@ -290,9 +290,9 @@ def run_PMS(n1_adm, n2_adm, loop):
 
 def run_2(t):
     print('entrou run2')
-    t0 = time.time()
+    tini = time.time()
     #### teste_pcorr
-    bif_utils.get_flux_coarse_volumes(tags_1, all_volumes, bound_faces_nv, tags_1['PMS2'], [meshset_vertices, meshset_vertices_nv2])
+    # bif_utils.get_flux_coarse_volumes(tags_1, all_volumes, bound_faces_nv, tags_1['PMS2'], [meshset_vertices, meshset_vertices_nv2])
 
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
     # vertices_nv1 = rng.subtract(sol_adm.vertices, elems_nv0)
@@ -300,6 +300,8 @@ def run_2(t):
 
     k = 0
     cont = 0
+
+
 
     for vert in vertices_nv1:
         t00 = time.time()
@@ -309,11 +311,9 @@ def run_2(t):
         faces = rng.subtract(faces, boundary_faces)
         faces_boundary = rng.intersect(faces, bound_faces_nv[k])
         t01 = time.time()
-        # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR1'], tags_1['PMS1'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1, pcorr2_tag=tags_1['PCORR2'])
-        # bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS1'], tags_1['PCORR1'])
         t02 = time.time()
-        # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
-        bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
+        bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        # bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
         t03 = time.time()
         bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS2'], tags_1['PCORR2'])
         t04 = time.time()
@@ -337,8 +337,8 @@ def run_2(t):
         faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
         faces = rng.subtract(faces, boundary_faces)
         faces_boundary = rng.intersect(faces, bound_faces_nv[k])
-        # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
-        bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
+        bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        # bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
         bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS2'], tags_1['PCORR2'])
 
     t1 = time.time()
@@ -352,9 +352,13 @@ def run_2(t):
     bif_utils.set_flux_pms_elems_nv0(elems_nv0, faces, tags_1['PMS2'])
     t1 = time.time()
     dt = t1 - t0
+    tend = time.time()
+    dtt = tend - tini
     # print(f'tempo nv0 fluxo {dt}\n')
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)
+    print(f'tempo total: {dtt}')
+
     mb.write_file('exemplo.vtk', [vv])
     import pdb; pdb.set_trace()
     print('saiu run2')
