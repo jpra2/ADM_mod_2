@@ -4,7 +4,7 @@ from pymoab import core, types, rng, topo_util
 import time
 import os
 import scipy
-from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
+from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find, lil_matrix
 import yaml
 
 
@@ -14,6 +14,8 @@ input_dir = os.path.join(parent_parent_dir, 'input')
 flying_dir = os.path.join(parent_parent_dir, 'flying')
 utils_dir = os.path.join(parent_parent_dir, 'utils')
 output_dir = os.path.join(parent_parent_dir, 'output')
+bifasico_dir = os.path.join(flying_dir, 'bifasico')
+sol_direta_dir =  os.path.join(bifasico_dir, 'sol_direta')
 
 import importlib.machinery
 loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
@@ -1258,6 +1260,155 @@ for m in meshsets_nv2:
 
     mb.tag_set_data(coarse_flux_nv3_tag, elems, np.repeat(qtot, len(elems)))
 
+#calculo da pressao corrigida:
+meshset_vertices_nv2 = mb.create_meshset()
+meshset_vertices_nv3 = mb.create_meshset()
+
+vertices_nv2 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([3]))
+mb.add_entities(meshset_vertices_nv2, vertices_nv2)
+vertices_nv3 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D2_tag]), np.array([3]))
+vertices_nv3 = rng.intersect(vertices_nv2, vertices_nv3)
+mb.add_entities(meshset_vertices_nv3, vertices_nv3)
+
+elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
+
+vertices_nv2 = mb.get_entities_by_type_and_tag(meshset_vertices_nv2, types.MBHEX, np.array([L3_ID_tag]), np.array([2]))
+
+vertices_nv3 = mb.get_entities_by_type_and_tag(meshset_vertices_nv3, types.MBHEX, np.array([L3_ID_tag]), np.array([3]))
+pcorr_tag = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
+p_tag = Sol_ADM_tag
+for vert in vertices_nv2:
+    primal_id = mb.tag_get_data(fine_to_primal1_classic_tag, vert, flat=True)[0]
+    elems_in_meshset = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([fine_to_primal1_classic_tag]), np.array([primal_id]))
+    n = len(elems_in_meshset)
+    map_volumes = dict(zip(elems_in_meshset, range(n)))
+    faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
+    faces = rng.subtract(faces, boundary_faces)
+    faces_boundary = rng.intersect(faces, all_faces_boundary_nv2)
+    b = np.zeros(n)
+
+    for face in faces_boundary:
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+        pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+        flux = (pmss[1] - pmss[0])*keq
+        if oth.gravity:
+            flux += s_grav
+
+        flux *= -1
+
+        if elems2[0] in elems_in_meshset:
+            b[map_volumes[elems2[0]]] += flux
+        else:
+            b[map_volumes[elems2[1]]] -= flux
+
+    lines = []
+    cols = []
+    data = []
+    for face in rng.subtract(faces, faces_boundary):
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+
+        s_grav *= -1
+
+        id0 = map_volumes[elems2[0]]
+        id1 = map_volumes[elems2[1]]
+        lines += [id0, id1]
+        cols += [id1, id0]
+        data += [keq, keq]
+        if oth.gravity:
+            b[id0] += s_grav
+            b[id1] -= s_grav
+
+    T = csc_matrix((data,(lines,cols)), shape=(n, n))
+    T = T.tolil()
+    d1 = np.array(T.sum(axis=1)).reshape(1, n)[0]*(-1)
+    T.setdiag(d1)
+
+    idv = map_volumes[vert]
+    T[idv] = np.zeros(n)
+    pms_vert = mb.tag_get_data(p_tag, vert, flat=True)[0]
+    T[idv, idv] = 1.0
+    b[idv] = pms_vert
+
+    resp = oth.get_solution(T, b)
+    mb.tag_set_data(pcorr_tag, elems_in_meshset, resp)
+
+for vert in vertices_nv3:
+    primal_id = mb.tag_get_data(fine_to_primal2_classic_tag, vert, flat=True)[0]
+    elems_in_meshset = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([fine_to_primal2_classic_tag]), np.array([primal_id]))
+    n = len(elems_in_meshset)
+    map_volumes = dict(zip(elems_in_meshset, range(n)))
+    faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
+    faces = rng.subtract(faces, boundary_faces)
+    faces_boundary = rng.intersect(faces, all_faces_boundary_nv3)
+    b = np.zeros(n)
+
+    for face in faces_boundary:
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+        pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+        flux = (pmss[1] - pmss[0])*keq
+        if oth.gravity:
+            flux += s_grav
+
+        flux *= -1
+
+        if elems2[0] in elems_in_meshset:
+            b[map_volumes[elems2[0]]] += flux
+        else:
+            b[map_volumes[elems2[1]]] -= flux
+
+    lines = []
+    cols = []
+    data = []
+    for face in rng.subtract(faces, faces_boundary):
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+
+        s_grav *= -1
+
+        id0 = map_volumes[elems2[0]]
+        id1 = map_volumes[elems2[1]]
+        lines += [id0, id1]
+        cols += [id1, id0]
+        data += [keq, keq]
+        if oth.gravity:
+            b[id0] += s_grav
+            b[id1] -= s_grav
+
+    T = csc_matrix((data,(lines,cols)), shape=(n, n))
+    T = T.tolil()
+    d1 = np.array(T.sum(axis=1)).reshape(1, n)[0]*(-1)
+    T.setdiag(d1)
+
+    idv = map_volumes[vert]
+    T[idv] = np.zeros(n)
+    pms_vert = mb.tag_get_data(p_tag, vert, flat=True)[0]
+    T[idv, idv] = 1.0
+    b[idv] = pms_vert
+
+    resp = oth.get_solution(T, b)
+    mb.tag_set_data(pcorr_tag, elems_in_meshset, resp)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 av = mb.create_meshset()
@@ -1265,10 +1416,13 @@ mb.add_entities(av, all_volumes)
 teste_tag=mb.tag_get_handle("teste", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 teste=OP_ADM*corr_adm2_sd
 for v in all_volumes: mb.tag_set_data(teste_tag,v,abs(teste[int(mb.tag_get_data(ID_reordenado_tag,v))]))
-os.chdir(output_dir)
+os.chdir(sol_direta_dir)
 mb.write_file('teste_3D_unstructured_18.h5m')
-mb.write_file('teste_3D_unstructured_18_tpfa.vtk',[av])
+mb.write_file('teste_3D_unstructured_tpfa.vtk',[av])
+
 print('New file created')
+
+import pdb; pdb.set_trace()
 print(min(erro),max(erro))
 
 

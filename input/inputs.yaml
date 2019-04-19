@@ -1,10 +1,10 @@
 input_file: '27x27x27'
 
-gravity: False
+gravity: True
 # adicionar o efeito da gravidade
 MPFA: False
 # estruturado ou nao
-bifasico: True
+bifasico: False
 # escoamento bifasico
 ADM: True
 # solucao multiescala ADM
