@@ -175,13 +175,16 @@ def load_adm_mesh():
 
     return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded
 
-def enumerar_volumes_nivel_1(mb, meshsets_nv1):
+def enumerar_volumes_nivel(mb, meshsets, level):
+    name_tag = 'IDS_NA_PRIMAL_' + str(level)
     ids_na_primal_tag = mb.tag_get_handle('IDS_NA_PRIMAL', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
     conts = 0
-    for m in meshsets_nv1:
+    for m in meshsets:
         elems = mb.get_entities_by_handle(m)
         n = len(elems)
         num1 = conts
         num2 = num1 + n
         mb.tag_set_data(ids_na_primal_tag, elems, np.arange(num1, num2))
         conts += n
+
+    return name_tag, ids_na_primal_tag

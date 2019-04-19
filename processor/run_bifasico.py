@@ -69,6 +69,7 @@ map_global = dict(zip(all_volumes, all_ids_reord))
 boundary_faces = mb.tag_get_data(tags_1['FACES_BOUNDARY'], 0, flat=True)[0]
 boundary_faces = mb.get_entities_by_handle(boundary_faces)
 faces_in = rng.subtract(all_faces, boundary_faces)
+bif_utils.all_faces_in = faces_in
 name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
 boundary_faces_nv2 = mb.get_entities_by_handle(mb.tag_get_data(mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(2)), 0, flat=True)[0])
 boundary_faces_nv3 = mb.get_entities_by_handle(mb.tag_get_data(mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(3)), 0, flat=True)[0])
@@ -89,8 +90,11 @@ tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB
 tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
 meshsets_nv2 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_2']]), np.array([None]))
-utpy.enumerar_volumes_nivel_1(mb, meshsets_nv1)
-tags_1['IDS_NA_PRIMAL'] = mb.tag_get_handle('IDS_NA_PRIMAL')
+meshsets_levels = [meshsets_nv1, meshsets_nv2]
+
+for i in range(len(meshsets_levels)):
+    name, tag = utpy.enumerar_volumes_nivel(mb, meshsets_nv1, i+2)
+    tags_1[name] = tag
 
 
 ####apagar
@@ -284,9 +288,12 @@ def run_PMS(n1_adm, n2_adm, loop):
     dt = t1-t0
     # print(f'run pms {dt} \n')
 
-def run_2_dep0(t):
+def run_2(t):
     print('entrou run2')
     t0 = time.time()
+    #### teste_pcorr
+    bif_utils.get_flux_coarse_volumes(tags_1, all_volumes, bound_faces_nv, tags_1['PMS2'], [meshset_vertices, meshset_vertices_nv2])
+
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
     # vertices_nv1 = rng.subtract(sol_adm.vertices, elems_nv0)
     vertices_nv1 = mb.get_entities_by_type_and_tag(meshset_vertices, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([2]))
@@ -305,7 +312,8 @@ def run_2_dep0(t):
         # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR1'], tags_1['PMS1'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1, pcorr2_tag=tags_1['PCORR2'])
         # bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS1'], tags_1['PCORR1'])
         t02 = time.time()
-        bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
         t03 = time.time()
         bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS2'], tags_1['PCORR2'])
         t04 = time.time()
@@ -329,7 +337,8 @@ def run_2_dep0(t):
         faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
         faces = rng.subtract(faces, boundary_faces)
         faces_boundary = rng.intersect(faces, bound_faces_nv[k])
-        bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        # bif_utils.calculate_pcorr(mb, elems_in_meshset, vert, faces_boundary, faces, tags_1['PCORR2'], tags_1['PMS2'], sol_adm.volumes_d, sol_adm.volumes_n, tags_1)
+        bif_utils.calculate_pcorr_v4(elems_in_meshset, tags_1['PCORR2'], tags_1)
         bif_utils.set_flux_pms_meshsets(elems_in_meshset, faces, faces_boundary, tags_1['PMS2'], tags_1['PCORR2'])
 
     t1 = time.time()
@@ -346,9 +355,11 @@ def run_2_dep0(t):
     # print(f'tempo nv0 fluxo {dt}\n')
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)
+    mb.write_file('exemplo.vtk', [vv])
+    import pdb; pdb.set_trace()
     print('saiu run2')
 
-def run_2(t):
+def run_2_v2(t):
     print('entrou run2')
     t0 = time.time()
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
