@@ -364,9 +364,6 @@ def run_2(t):
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)
     print(f'tempo total: {dtt}')
-
-    mb.write_file('exemplo.vtk', [vv])
-    import pdb; pdb.set_trace()
     print('saiu run2')
 
 def run_2_v2(t):
@@ -429,16 +426,21 @@ verif = True
 verif_imp = False
 cont_imp = 0
 verif_vpi = False
+contador = 0
 
 if ADM:
     os.chdir(bifasico_sol_multiescala_dir)
 
     while verif:
+        contador += 1
+        if contador == 30:
+            contador = 0
+            import pdb; pdb.set_trace()
 
         t0 = time.time()
         t, loop = run(t, loop)
-        mb.write_file('exemplottt.vtk', [vv])
-        import pdb; pdb.set_trace()
+
+
 
         # if cont_imp < len(tempos_impr):
         #     if bif_utils.vpi >= tempos_impr[cont_imp]:

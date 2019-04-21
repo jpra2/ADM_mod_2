@@ -197,7 +197,7 @@ class bifasico:
         # self.vpi += vpi
         return cfl
 
-    def rec_cfl(self, cfl):
+    def rec_cfl_dep1(self, cfl):
 
         cfl = 0.5*cfl
         self.cfl = cfl
@@ -263,6 +263,20 @@ class bifasico:
         self.flux_total_producao = self.flux_total_prod
         return cfl
 
+    def rec_cfl(self, cfl):
+
+        k = 0.5
+        cfl = k*cfl
+        print('novo cfl', cfl)
+        # qmax = np.absolute(self.mb.tag_get_data(self.flux_in_faces_tag, self.all_faces_in, flat=True)).max()
+        # dfdsmax = self.mb.tag_get_data(self.dfds_tag, self.all_faces_in, flat=True).max()
+        # self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
+        # self.delta_t = cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+        self.delta_t *= k
+        # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        # self.vpi += vpi
+        return cfl
+
     def set_sat_in(self, all_volumes):
         """
         seta a saturacao inicial
@@ -318,7 +332,7 @@ class bifasico:
         self.mb.tag_set_data(self.lbt_tag, all_volumes, all_lbt)
         self.mb.tag_set_data(self.fw_tag, all_volumes, all_fw)
 
-    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini_dep0(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         all_lbt = self.mb.tag_get_data(self.lbt_tag, all_volumes, flat=True)
@@ -372,15 +386,16 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces_ini_v2(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
 
         all_lbt = self.mb.tag_get_data(self.lbt_tag, all_volumes, flat=True)
-        all_centroids = np.array([self.mtu.get_average_position([v]) for v in all_volumes])
-        for i, v in enumerate(all_volumes):
-            self.mb.tag_set_data(self.cent_tag, v, all_centroids[i])
+        # all_centroids = np.array([self.mtu.get_average_position([v]) for v in all_volumes])
+        # for i, v in enumerate(all_volumes):
+        #     self.mb.tag_set_data(self.cent_tag, v, all_centroids[i])
+        all_centroids = self.all_centroids
         all_fw = self.mb.tag_get_data(self.fw_tag, all_volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, all_volumes, flat=True)
         all_ks = self.mb.tag_get_data(self.perm_tag, all_volumes)
@@ -432,7 +447,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces(self, volumes, faces, finos0=None):
+    def set_mobi_faces_dep0(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -507,7 +522,7 @@ class bifasico:
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
-    def set_mobi_faces_v2(self, volumes, faces, finos0=None):
+    def set_mobi_faces(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -515,7 +530,7 @@ class bifasico:
         seta a mobilidade nas faces uma vez calculada a pressao corrigida
         """
         # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        lim_sat = 0.01
+        lim_sat = 0.15
         finos = self.mb.create_meshset()
         self.mb.tag_set_data(self.finos_tag, 0, finos)
         if finos0 == None:
@@ -528,18 +543,21 @@ class bifasico:
         all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
         all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
-        all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
-        all_ks =self.mb.tag_get_data(self.perm_tag, volumes)
+        # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
+        all_centroids = self.all_centroids
+        all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
 
         all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
-        all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
+        # all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
         all_mobi_in_faces = np.zeros(len(faces))
         all_s_gravs = all_mobi_in_faces.copy()
         all_fw_in_face = all_mobi_in_faces.copy()
         all_dfds = all_mobi_in_faces.copy()
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
 
         for i, face in enumerate(faces):
-            elems = self.mb.get_adjacencies(face, 3)
+            # elems = self.mb.get_adjacencies(face, 3)
+            elems = Adjs[i]
             # lbt0 = self.mb.tag_get_data(self.lbt_tag, elems[0], flat=True)[0]
             # lbt1 = self.mb.tag_get_data(self.lbt_tag, elems[1], flat=True)[0]
             id0 = map_volumes[elems[0]]
@@ -1519,6 +1537,8 @@ class bifasico:
         qw = (flux_total_prod*fws).sum()*self.delta_t
         qo = (flux_total_prod.sum()- qw)*self.delta_t
         wor = qw/float(qo)
+        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        self.vpi += vpi
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
         historico = np.load('historico.npy')

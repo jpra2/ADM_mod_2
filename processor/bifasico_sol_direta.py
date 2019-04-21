@@ -652,13 +652,13 @@ class sol_direta_bif:
         """
         # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         lim_sat = 0.01
-        finos = self.mb.create_meshset()
-        self.mb.tag_set_data(self.finos_tag, 0, finos)
-        if finos0 == None:
-            self.mb.add_entities(finos, self.wells_injector)
-            self.mb.add_entities(finos, self.wells_producer)
-        else:
-            self.mb.add_entities(finos, finos0)
+        # finos = self.mb.create_meshset()
+        # self.mb.tag_set_data(self.finos_tag, 0, finos)
+        # if finos0 == None:
+        #     self.mb.add_entities(finos, self.wells_injector)
+        #     self.mb.add_entities(finos, self.wells_producer)
+        # else:
+        #     self.mb.add_entities(finos, finos0)
 
         map_volumes = dict(zip(volumes, range(len(volumes))))
         all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
@@ -699,8 +699,8 @@ class sol_direta_bif:
                 all_dfds[i] = 0.0
             else:
                 all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
-            if abs(sat0 - sat1) > lim_sat:
-                self.mb.add_entities(finos, elems)
+            # if abs(sat0 - sat1) > lim_sat:
+            #     self.mb.add_entities(finos, elems)
 
             flux_in_face = all_flux_in_faces[i]
             if elems[0] in self.wells_injector:
