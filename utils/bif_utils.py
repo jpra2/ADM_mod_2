@@ -74,6 +74,8 @@ class bifasico:
         self.cent_tag = mb.tag_get_handle('CENT')
         self.dfds_tag = mb.tag_get_handle('DFDS')
         self.finos_tag = mb.tag_get_handle('finos')
+        self.map_all_volumes = dict(zip(all_volumes, range(len(all_volumes))))
+        self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
         self.mb = mb
         self.mtu = mtu
         self.gama = self.gama_w + self.gama_o
@@ -1137,7 +1139,7 @@ class bifasico:
         for face in faces_in:
             id_face = map_id_faces[face]
             mobi = allmobis[id_face]
-            s_g = s_gravs[id_face]
+            s_g = -s_gravs[id_face]
             id_face = map_id_faces[face]
             elem0 = Adjs[id_face][0]
             elem1 = Adjs[id_face][1]
@@ -1151,7 +1153,7 @@ class bifasico:
 
         for face in faces_boundary:
             id_face = map_id_faces[face]
-            mobi = -allmobis[id_face]
+            mobi = allmobis[id_face]
             s_g = -s_gravs[id_face]
             elem0 = Adjs[id_face][0]
             elem1 = Adjs[id_face][1]
@@ -1161,7 +1163,7 @@ class bifasico:
             except KeyError:
                 id = map_local[elem1]
                 vvv = False
-            flux = (map_pms_vols3[elem1] - map_pms_vols3[elem0])*mobi
+            flux = -(map_pms_vols3[elem1] - map_pms_vols3[elem0])*mobi
             if vvv:
                 b[id] += s_g + flux
             else:

@@ -7,6 +7,8 @@ import yaml
 import scipy.sparse as sp
 import time
 import conversao as conv
+from utils.others_utils import OtherUtils as oth
+
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -16,8 +18,8 @@ utils_dir = os.path.join(parent_parent_dir, 'utils')
 output_dir = os.path.join(parent_parent_dir, 'output')
 
 import importlib.machinery
-loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
-oth = loader.load_module('others_utils').OtherUtils
+# loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
+# oth = loader.load_module('others_utils').OtherUtils
 
 class sol_direta_bif:
 
@@ -25,6 +27,7 @@ class sol_direta_bif:
         self.k2 = 0.9
         self.cfl_ini = self.k2
         self.cfl = self.k2
+        self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
         self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
         self.mi_o = mb.tag_get_data(mb.tag_get_handle('MI_O'), 0, flat=True)[0]
@@ -83,8 +86,8 @@ class sol_direta_bif:
         # hs[1] = conv.pe_to_m(hs[1])
         #
         # self.hs = hs
-        # vol = hs[0]*hs[1]*hs[2]
-        vol = 1.0
+        vol = hs[0]*hs[1]*hs[2]
+        # vol = 1.0
         self.mb.tag_set_data(self.volume_tag, all_volumes, np.repeat(vol, len(all_volumes)))
         self.Vmin = vol
         self.fimin = phis.min()
@@ -259,6 +262,7 @@ class sol_direta_bif:
         calcula a saturacao do passo de tempo corrente
         """
         #self.loop = loop
+        delta_sat = 0.001
         t1 = time.time()
         lim = 1e-10
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
@@ -273,7 +277,7 @@ class sol_direta_bif:
             # gid = mb.tag_get_data(self.global_id_tag, volume, flat=True)[0]
             sat1 = all_sats[i]
             V = all_volumes[i]
-            if volume in self.wells_injector:
+            if volume in self.wells_injector or sat1 == 0.8:
                 sats_2[i] = sat1
                 continue
             if sat1 == 0.8:
@@ -310,7 +314,10 @@ class sol_direta_bif:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat > 0.8:
+            if sat < 0.8 - delta_sat and sat > 0.8 + delta_sat:
+                sat = 0.8
+
+            elif sat > 0.8:
                 #sat = 1 - self.Sor
                 print("Sat > 0.8")
                 print(sat)
@@ -329,7 +336,6 @@ class sol_direta_bif:
                 print(f'sat: {sat}')
                 print(f'sat1: {sat1}\n')
                 return 1
-
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:
@@ -403,7 +409,7 @@ class sol_direta_bif:
         self.mb.tag_set_data(self.sat_tag, volumes, sats_2)
         self.mb.tag_set_data(self.sat_last_tag, volumes, all_sats)
 
-    def calc_cfl(self, faces_in):
+    def calc_cfl_dep0(self, faces_in):
         """
         cfl usando fluxo maximo
         """
@@ -419,13 +425,87 @@ class sol_direta_bif:
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
 
-    def rec_cfl(self, cfl):
+    def calc_cfl(self, all_faces_in):
+        """
+        cfl usando fluxo em cada volume
+        """
+        lim_sup = 1e5
+        self.cfl = self.cfl_ini
+        self.all_faces_in = all_faces_in
+        qs = self.mb.tag_get_data(self.flux_in_faces_tag, all_faces_in, flat=True)
+        dfdss = self.mb.tag_get_data(self.dfds_tag, all_faces_in, flat=True)
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        all_volumes = self.mtu.get_bridge_adjacencies(all_faces_in, 2, 3)
+        delta_ts = np.zeros(len(all_volumes))
+        faces_volumes = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in all_volumes]
+        phis = self.mb.tag_get_data(self.phi_tag, all_volumes, flat=True)
+        Vs = self.mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
+        map_faces = dict(zip(all_faces_in, range(len(all_faces_in))))
+
+        # self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+
+        for i, v in enumerate(all_volumes):
+            V = Vs[i]
+            phi = phis[i]
+            if phi == 0:
+                delta_ts[i] = lim_sup
+                continue
+            faces = faces_volumes[i]
+            faces = rng.intersect(all_faces_in, faces)
+            ids_faces = [map_faces[f] for f in faces]
+            q_faces = qs[ids_faces]
+            dfdss_faces = dfdss[ids_faces]
+            qmax = q_faces.max()
+            ind = np.where(q_faces == qmax)[0]
+            dfds = dfdss_faces[ind][0]
+            if dfds == 0.0:
+                dt1 = lim_sup
+            else:
+                qmax = abs(qmax)
+                dt1 = self.cfl*(phi*V)/float(qmax*dfds)
+                if dt1 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            dfds_max = dfdss_faces.max()
+            if dfds_max == 0:
+                dt2 = dt1
+            else:
+                ind = np.where(dfdss_faces == dfds_max)[0]
+                q2 = abs(q_faces[ind][0])
+                dt2 = self.cfl*(phi*V)/float(q2*dfds_max)
+                if dt2 < 0:
+                    print('erro')
+                    import pdb; pdb.set_trace()
+
+            delta_ts[i] = min([dt1, dt2])
+            if delta_ts[i] > self.delta_t_min:
+                delta_ts[i] = self.delta_t_min
+
+
+        self.delta_t = delta_ts.min()
+        self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
+        self.flux_total_producao = self.flux_total_prod
+
+    def rec_cfl_dep0(self, cfl):
         cfl = 0.5*cfl
         print('novo cfl', cfl)
         qmax = np.absolute(self.mb.tag_get_data(self.flux_in_faces_tag, self.all_faces_in, flat=True)).max()
         dfdsmax = self.mb.tag_get_data(self.dfds_tag, self.all_faces_in, flat=True).max()
         self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
         self.delta_t = cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
+        # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        # self.vpi += vpi
+        return cfl
+
+    def rec_cfl(self, cfl):
+        k = 0.5
+        cfl = k*cfl
+        print('novo cfl', cfl)
+        # qmax = np.absolute(self.mb.tag_get_data(self.flux_in_faces_tag, self.all_faces_in, flat=True)).max()
+        # dfdsmax = self.mb.tag_get_data(self.dfds_tag, self.all_faces_in, flat=True).max()
+        # self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
+        self.delta_t *= k
         # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
         # self.vpi += vpi
         return cfl
@@ -690,25 +770,25 @@ class sol_direta_bif:
         cols_tf = []
         data_tf = []
 
-        s_grav = np.zeros(len(all_volumes))
+        s_gravs = np.zeros(len(all_volumes))
         all_mobis = self.mb.tag_get_data(self.mobi_in_faces_tag, faces_in, flat=True)
 
         for i, f in enumerate(faces_in):
-            elems = self.mb.get_adjacencies(face, 3)
+            elems = self.mb.get_adjacencies(f, 3)
             id0 = self.map_volumes[elems[0]]
             id1 = self.map_volumes[elems[1]]
-            mobi = mobi_in_faces[i]
+            mobi = all_mobis[i]
             s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
             if self.gravity:
-                s_grav[id0] += s_grav
-                s_grav[id1] -= s_grav
+                s_gravs[id0] += s_grav
+                s_gravs[id1] -= s_grav
             # Gid_1=all_ids_reord[id_0]
             # Gid_2=all_ids_reord[id_1]
             Gid_1 = id0
             Gid_2 = id1
             lines_tf += [Gid_1, Gid_2]
             cols_tf += [Gid_2, Gid_1]
-            data_tf += [keq, keq]
+            data_tf += [mobi, mobi]
 
         n = len(all_volumes)
         Tf = sp.csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
@@ -716,7 +796,7 @@ class sol_direta_bif:
         d1 = np.array(Tf.sum(axis=1)).reshape(1, n)[0]*(-1)
         Tf.setdiag(d1)
 
-        return Tf, s_grav
+        return Tf, s_gravs
 
     def solution_PF(self, all_volumes, map_volumes, faces_in, dict_tags):
         Tf, b = self.get_Tf_and_b(all_volumes, map_volumes, faces_in, dict_tags)

@@ -437,6 +437,8 @@ if ADM:
 
         t0 = time.time()
         t, loop = run(t, loop)
+        mb.write_file('exemplottt.vtk', [vv])
+        import pdb; pdb.set_trace()
 
         # if cont_imp < len(tempos_impr):
         #     if bif_utils.vpi >= tempos_impr[cont_imp]:
