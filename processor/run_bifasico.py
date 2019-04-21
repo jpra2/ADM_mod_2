@@ -156,26 +156,26 @@ def set_keq(all_volumes, faces_in, tags):
     mb.tag_set_data(tags['K_EQ'], faces_in, keqs)
 
 
-set_keq(all_volumes, faces_in, tags_1)
+# set_keq(all_volumes, faces_in, tags_1)
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
 k01 = 1e-3
 # vazao_inj = 5000*k01 #bbl/dia
 # vazao_inj = conv.bbldia_to_m3seg(vazao_inj) #m3/s
-vazao_inj = 1.0
+# vazao_inj = 100.0
 # vazao_inj = conv.bbldia_to_m3seg(vazao_inj) #m3/s
-mb.tag_set_data(tags_1['Q'], sol_adm.volumes_n, np.repeat(-1.0*vazao_inj, len(sol_adm.volumes_n)))
+# mb.tag_set_data(tags_1['Q'], sol_adm.volumes_n, np.repeat(-1.0*vazao_inj, len(sol_adm.volumes_n)))
 # press_prod = 4000 #psi
 # press_prod = conv.psi_to_Pa(press_prod) #Pascal
-Lz = 27.0
-press_prod = 1.0 #psi
-z_elems_d = -1*np.array([mtu.get_average_position([v])[2] for v in sol_adm.volumes_d])
-delta_z = z_elems_d + Lz
-press_prod = bif_utils.gama*(delta_z) + press_prod
+# Lz = 27.0
+# press_prod = 1.0 #psi
+# z_elems_d = -1*np.array([mtu.get_average_position([v])[2] for v in sol_adm.volumes_d])
+# delta_z = z_elems_d + Lz
+# press_prod = bif_utils.gama*(delta_z) + press_prod
 # import pdb; pdb.set_trace()
 # press_prod = conv.psi_to_Pa(press_prod) #Pascal
 # mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, np.repeat(press_prod, len(sol_adm.volumes_d)))
-mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, press_prod)
+# mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, press_prod)
 map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)))
 map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)))
 

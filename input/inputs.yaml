@@ -4,9 +4,9 @@ gravity: True
 # adicionar o efeito da gravidade
 MPFA: False
 # estruturado ou nao
-bifasico: False
+bifasico: True
 # escoamento bifasico
-ADM: True
+ADM: False
 # solucao multiescala ADM
 
 rs:
@@ -28,7 +28,7 @@ Wells_structured:
     region1: [0.0, 0.0, 0.0]
     region2: [1.0, 27.0, 27.0]
     type_prescription: 'neumann'
-    value: 7290.0
+    value: 72900.0
     type_well: 'injector'
     type_fluid: Null
 

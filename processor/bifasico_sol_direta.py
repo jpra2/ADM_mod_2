@@ -62,6 +62,8 @@ class sol_direta_bif:
         self.dfds_tag = mb.tag_get_handle('DFDS')
         self.finos_tag = mb.tag_get_handle('finos')
         self.pf_tag = mb.tag_get_handle('PF')
+        self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
+        self.map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
         self.mb = mb
         self.mtu = mtu
         self.gama = self.gama_w + self.gama_o
@@ -93,7 +95,7 @@ class sol_direta_bif:
         self.V_total = float((self.V_total*mb.tag_get_data(self.phi_tag, all_volumes, flat=True)).sum())
         self.vpi = 0.0
 
-    def calculate_total_flux(self, volumes, faces):
+    def calculate_total_flux_dep0(self, volumes, faces):
 
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
@@ -123,6 +125,43 @@ class sol_direta_bif:
                 flux += s_grav
                 fluxo_grav_volumes[id0] += s_grav
                 fluxo_grav_volumes[id1] -= s_grav
+            fluxos[id0] += flux
+            fluxos_w[id0] += flux*fw
+            fluxos[id1] -= flux
+            fluxos_w[id1] -= flux*fw
+            flux_in_faces[i] = flux
+
+        self.mb.tag_set_data(self.total_flux_tag, volumes, fluxos)
+        self.mb.tag_set_data(self.flux_w_tag, volumes, fluxos_w)
+        self.mb.tag_set_data(self.flux_in_faces_tag, faces, flux_in_faces)
+        self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
+
+    def calculate_total_flux(self, volumes, faces):
+
+        mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
+        ps = self.mb.tag_get_data(self.pf_tag, volumes, flat=True)
+
+        fluxos = np.zeros(len(volumes))
+        fluxos_w = fluxos.copy()
+        flux_in_faces = np.zeros(len(faces))
+        fluxo_grav_volumes = np.zeros(len(volumes))
+
+        for i, face in enumerate(faces):
+            elems = self.mb.get_adjacencies(face, 3)
+            id0 = self.map_volumes[elems[0]]
+            id1 = self.map_volumes[elems[1]]
+            mobi = mobi_in_faces[i]
+            s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            fw = fws_faces[i]
+            flux = (ps[id1] - ps[id0])*mobi
+            if self.gravity == True:
+                flux += s_grav
+                fluxo_grav_volumes[id0] += s_grav
+                fluxo_grav_volumes[id1] -= s_grav
+
+            # flux *= -1
+
             fluxos[id0] += flux
             fluxos_w[id0] += flux*fw
             fluxos[id1] -= flux
@@ -377,8 +416,8 @@ class sol_direta_bif:
         self.flux_total_producao = self.flux_total_prod
 
         self.delta_t = self.cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
-        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
-        self.vpi += vpi
+        # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        # self.vpi += vpi
 
     def rec_cfl(self, cfl):
         cfl = 0.5*cfl
@@ -387,8 +426,8 @@ class sol_direta_bif:
         dfdsmax = self.mb.tag_get_data(self.dfds_tag, self.all_faces_in, flat=True).max()
         self.flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True).sum()
         self.delta_t = cfl*(self.fimin*self.Vmin)/float(qmax*dfdsmax)
-        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
-        self.vpi += vpi
+        # vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        # self.vpi += vpi
         return cfl
 
     def get_hist(self, t, dt):
@@ -398,6 +437,8 @@ class sol_direta_bif:
         qw = (flux_total_prod*fws).sum()*self.delta_t
         qo = (flux_total_prod.sum() - qw)*self.delta_t
         wor = qw/float(qo)
+        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        self.vpi += vpi
 
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
@@ -610,9 +651,6 @@ class sol_direta_bif:
         lines_tf = []
         cols_tf = []
         data_tf = []
-        lines_ttf = []
-        cols_ttf = []
-        data_ttf = []
 
         if self.gravity:
             all_s_gravs = self.mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)
@@ -638,6 +676,39 @@ class sol_direta_bif:
             flux_grav = -all_s_gravs[i]
             s_grav[id_0] += flux_grav
             s_grav[id_1] -= flux_grav
+
+        n = len(all_volumes)
+        Tf = sp.csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
+        Tf = Tf.tolil()
+        d1 = np.array(Tf.sum(axis=1)).reshape(1, n)[0]*(-1)
+        Tf.setdiag(d1)
+
+        return Tf, s_grav
+
+    def get_Tf_and_b_v2(self, all_volumes, map_volumes, faces_in, dict_tags):
+        lines_tf = []
+        cols_tf = []
+        data_tf = []
+
+        s_grav = np.zeros(len(all_volumes))
+        all_mobis = self.mb.tag_get_data(self.mobi_in_faces_tag, faces_in, flat=True)
+
+        for i, f in enumerate(faces_in):
+            elems = self.mb.get_adjacencies(face, 3)
+            id0 = self.map_volumes[elems[0]]
+            id1 = self.map_volumes[elems[1]]
+            mobi = mobi_in_faces[i]
+            s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            if self.gravity:
+                s_grav[id0] += s_grav
+                s_grav[id1] -= s_grav
+            # Gid_1=all_ids_reord[id_0]
+            # Gid_2=all_ids_reord[id_1]
+            Gid_1 = id0
+            Gid_2 = id1
+            lines_tf += [Gid_1, Gid_2]
+            cols_tf += [Gid_2, Gid_1]
+            data_tf += [keq, keq]
 
         n = len(all_volumes)
         Tf = sp.csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))

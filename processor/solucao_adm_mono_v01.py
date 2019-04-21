@@ -1539,6 +1539,33 @@ for face in rng.subtract(faces, faces_boundary):
 
 mb.tag_set_data(fluxo_mult_tag, elems_nv0, fluxos)
 
+fluxo_tpfa_tag = mb.tag_get_handle('FLUXO_TPFA', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+p_tag = Sol_TPFA_tag
+n = len(all_volumes)
+map_volumes = dict(zip(all_volumes, range(n)))
+faces = rng.subtract(all_faces, boundary_faces)
+fluxos = np.zeros(n)
+
+for face in faces:
+    keq = map_all_keqs[face]
+    s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+    ptpfa = mb.tag_get_data(p_tag, elems2, flat=True)
+    flux = (ptpfa[1] - ptpfa[0])*keq
+    if oth.gravity:
+        flux += s_grav
+
+    flux *= -1
+
+    id0 = map_volumes[elems2[0]]
+    id1 = map_volumes[elems2[1]]
+    fluxos[id0] += flux
+    fluxos[id1] -= flux
+
+mb.tag_set_data(fluxo_tpfa_tag, all_volumes, fluxos)
+
+
+
+
 av = mb.create_meshset()
 mb.add_entities(av, all_volumes)
 teste_tag=mb.tag_get_handle("teste", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
