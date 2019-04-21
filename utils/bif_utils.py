@@ -437,7 +437,7 @@ class bifasico:
         """
         seta a mobilidade nas faces uma vez calculada a pressao corrigida
         """
-        finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         lim_sat = 0.15
         finos = self.mb.create_meshset()
         self.mb.tag_set_data(self.finos_tag, 0, finos)

@@ -1392,24 +1392,152 @@ for vert in vertices_nv3:
     resp = oth.get_solution(T, b)
     mb.tag_set_data(pcorr_tag, elems_in_meshset, resp)
 
+#### calcular o fluxo multiescala
+p_tag = Sol_ADM_tag
+fluxo_mult_tag = mb.tag_get_handle('FLUXO_MULTIESCALA', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+###volumes que estao no nivel 3
+for vert in vertices_nv3:
+    primal_id = mb.tag_get_data(fine_to_primal2_classic_tag, vert, flat=True)[0]
+    elems_in_meshset = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([fine_to_primal2_classic_tag]), np.array([primal_id]))
+    n = len(elems_in_meshset)
+    map_volumes = dict(zip(elems_in_meshset, range(n)))
+    faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
+    faces = rng.subtract(faces, boundary_faces)
+    faces_boundary = rng.intersect(faces, all_faces_boundary_nv3)
+    fluxos = np.zeros(n)
 
+    for face in faces_boundary:
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+        pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+        flux = (pmss[1] - pmss[0])*keq
+        if oth.gravity:
+            flux += s_grav
 
+        flux *= -1
 
+        if elems2[0] in elems_in_meshset:
+            fluxos[map_volumes[elems2[0]]] += flux
+        else:
+            fluxos[map_volumes[elems2[1]]] -= flux
 
+    for face in rng.subtract(faces, faces_boundary):
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
 
+        # s_grav *= -1
 
+        id0 = map_volumes[elems2[0]]
+        id1 = map_volumes[elems2[1]]
+        ps_corr = mb.tag_get_data(pcorr_tag, elems2, flat=True)
+        flux = (ps_corr[1] - ps_corr[0])*keq
 
+        if oth.gravity:
+            flux += s_grav
 
+        flux *= -1
 
+        fluxos[map_volumes[elems2[0]]] += flux
+        fluxos[map_volumes[elems2[1]]] -= flux
 
+    mb.tag_set_data(fluxo_mult_tag, elems_in_meshset, fluxos)
 
+###volumes no nivel 2
+for vert in vertices_nv2:
+    primal_id = mb.tag_get_data(fine_to_primal1_classic_tag, vert, flat=True)[0]
+    elems_in_meshset = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([fine_to_primal1_classic_tag]), np.array([primal_id]))
+    n = len(elems_in_meshset)
+    map_volumes = dict(zip(elems_in_meshset, range(n)))
+    faces = mtu.get_bridge_adjacencies(elems_in_meshset, 3, 2)
+    faces = rng.subtract(faces, boundary_faces)
+    faces_boundary = rng.intersect(faces, all_faces_boundary_nv2)
+    fluxos = np.zeros(n)
 
+    for face in faces_boundary:
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+        pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+        flux = (pmss[1] - pmss[0])*keq
+        if oth.gravity:
+            flux += s_grav
 
+        flux *= -1
 
+        if elems2[0] in elems_in_meshset:
+            fluxos[map_volumes[elems2[0]]] += flux
+        else:
+            fluxos[map_volumes[elems2[1]]] -= flux
 
+    for face in rng.subtract(faces, faces_boundary):
+        keq = map_all_keqs[face]
+        s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
 
+        # s_grav *= -1
 
+        id0 = map_volumes[elems2[0]]
+        id1 = map_volumes[elems2[1]]
+        ps_corr = mb.tag_get_data(pcorr_tag, elems2, flat=True)
+        flux = (ps_corr[1] - ps_corr[0])*keq
 
+        if oth.gravity:
+            flux += s_grav
+
+        flux *= -1
+
+        fluxos[map_volumes[elems2[0]]] += flux
+        fluxos[map_volumes[elems2[1]]] -= flux
+
+    mb.tag_set_data(fluxo_mult_tag, elems_in_meshset, fluxos)
+
+###volumes no nivel 0 ou 1
+
+faces = mtu.get_bridge_adjacencies(elems_nv0, 3, 2)
+faces = rng.subtract(faces, boundary_faces)
+volumes_2 = mtu.get_bridge_adjacencies(elems_nv0, 2, 3) # volumes no nivel_0 uniao com os seus vizinhos
+volumes_3 = rng.subtract(volumes_2, elems_nv0)
+faces_3 = mtu.get_bridge_adjacencies(volumes_3, 3, 2)
+faces_boundary = rng.intersect(faces, faces_3)
+n = len(elems_nv0)
+map_volumes = dict(zip(elems_nv0, range(n)))
+fluxos = np.zeros(n)
+
+for face in faces_boundary:
+    keq = map_all_keqs[face]
+    s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+    pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+    flux = (pmss[1] - pmss[0])*keq
+    if oth.gravity:
+        flux += s_grav
+
+    flux *= -1
+    vvv = True
+    try:
+        id = map_volumes[elems2[0]]
+    except KeyError:
+        id = map_volumes[elems2[1]]
+        vvv = False
+
+    if vvv:
+        fluxos[id] += flux
+    else:
+        fluxos[id] -= flux
+
+for face in rng.subtract(faces, faces_boundary):
+    keq = map_all_keqs[face]
+    s_grav, elems2 = oth.get_sgrav_adjs_by_face(mb, mtu, face, keq)
+    pmss = mb.tag_get_data(p_tag, elems2, flat=True)
+    flux = (pmss[1] - pmss[0])*keq
+    if oth.gravity:
+        flux += s_grav
+
+    flux *= -1
+
+    id0 = map_volumes[elems2[0]]
+    id1 = map_volumes[elems2[1]]
+    fluxos[id0] += flux
+    fluxos[id1] -= flux
+
+mb.tag_set_data(fluxo_mult_tag, elems_nv0, fluxos)
 
 av = mb.create_meshset()
 mb.add_entities(av, all_volumes)
