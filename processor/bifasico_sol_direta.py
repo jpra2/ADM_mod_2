@@ -269,6 +269,8 @@ class sol_direta_bif:
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
         all_volumes = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
+        all_fw = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
+        all_total_flux = self.mb.tag_get_data(self.total_flux_tag, volumes, flat=True)
         # all_Vs = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
 
         sats_2 = np.zeros(len(volumes))
@@ -305,16 +307,22 @@ class sol_direta_bif:
             # if self.loop > 1:
             #     import pdb; pdb.set_trace()
             fi = all_fis[i]
-            # if fi == 0.0:
-            #     sats_2[i] = sat1
-            #     continue
-            sat = sat1 + qw*(self.delta_t/(fi*V))
+            if fi == 0.0:
+                sats_2[i] = sat1
+                continue
+            if volume in self.wells_producer:
+                fw = all_fw[i]
+                flux = all_total_flux[i]
+                qw_out = flux*fw
+            else:
+                qw_out = 0.0
+            sat = sat1 + (qw - qw_out)*(self.delta_t/(fi*V))
             # sat = sat1 + qw*(self.delta_t/(self.fimin*self.Vmin))
             # if sat1 > sat + lim:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat < 0.8 - delta_sat and sat > 0.8 + delta_sat:
+            if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
                 sat = 0.8
 
             elif sat > 0.8:
