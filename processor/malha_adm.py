@@ -36,6 +36,13 @@ class malha_adm:
 
     def generate_adm_mesh(self, mb, all_volumes, loop=0):
 
+        nn = len(all_volumes)
+        map_volumes = dict(zip(all_volumes, range(nn)))
+
+        list_L1_ID = np.ones(nn, dtype = np.int32)
+        list_L2_ID = list_L1_ID.copy()
+        list_L3_ID = list_L1_ID.copy()
+
         L2_meshset = self.L2_meshset
         finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
         finos = list(mb.get_entities_by_handle(finos))
@@ -68,13 +75,21 @@ class malha_adm:
                         n1+=1
                         n2+=1
 
-                        mb.tag_set_data(self.tags['l1_ID'], elem, n1)
-                        mb.tag_set_data(self.tags['l2_ID'], elem, n2)
-                        mb.tag_set_data(self.tags['l3_ID'], elem, 1)
+                        # mb.tag_set_data(self.tags['l1_ID'], elem, n1)
+                        # mb.tag_set_data(self.tags['l2_ID'], elem, n2)
+                        # mb.tag_set_data(self.tags['l3_ID'], elem, 1)
                         # elem_tags = self.mb.tag_get_tags_on_entity(elem)
                         # elem_Global_ID = self.mb.tag_get_data(elem_tags[0], elem, flat=True)
                         finos.append(elem)
                         # finos = rng.unite(finos, rng.Range(elem))
+
+                        level = 1
+
+                        id_elem = map_volumes[elem]
+                        list_L1_ID[id_elem] = n1
+                        list_L2_ID[id_elem] = n2
+                        list_L3_ID[id_elem] = level
+
 
             if tem_poço_no_vizinho:
                 for m1 in meshset_by_L1:
@@ -84,10 +99,19 @@ class malha_adm:
                     t=1
                     for elem in elem_by_L1:
                         if elem not in finos:
-                            mb.tag_set_data(self.tags['l1_ID'], elem, n1)
-                            mb.tag_set_data(self.tags['l2_ID'], elem, n2)
-                            mb.tag_set_data(self.tags['l3_ID'], elem, 2)
+
+                            # mb.tag_set_data(self.tags['l1_ID'], elem, n1)
+                            # mb.tag_set_data(self.tags['l2_ID'], elem, n2)
+                            # mb.tag_set_data(self.tags['l3_ID'], elem, 2)
                             t=0
+
+                            level = 2
+                            id_elem = map_volumes[elem]
+                            list_L1_ID[id_elem] = n1
+                            list_L2_ID[id_elem] = n2
+                            list_L3_ID[id_elem] = level
+
+
                     n1-=t
                     n2-=t
             else:
@@ -97,18 +121,32 @@ class malha_adm:
                     n1+=1
                     for elem2 in elem_by_L1:
                         # elem2_tags = self.mb.tag_get_tags_on_entity(elem)
-                        mb.tag_set_data(self.tags['l2_ID'], elem2, n2)
-                        mb.tag_set_data(self.tags['l1_ID'], elem2, n1)
-                        mb.tag_set_data(self.tags['l3_ID'], elem2, 3)
+                        # mb.tag_set_data(self.tags['l2_ID'], elem2, n2)
+                        # mb.tag_set_data(self.tags['l1_ID'], elem2, n1)
+                        # mb.tag_set_data(self.tags['l3_ID'], elem2, 3)
+
+                        id_elem = map_volumes[elem2]
+                        level = 3
+                        list_L1_ID[id_elem] = n1
+                        list_L2_ID[id_elem] = n2
+                        list_L3_ID[id_elem] = level
+
 
         # ------------------------------------------------------------------------------
         print('Definição da malha ADM: ',time.time()-t0)
         t0=time.time()
 
         # fazendo os ids comecarem de 0 em todos os niveis
-        tags = [self.tags['l1_ID'], self.tags['l2_ID']]
-        for tag in tags:
-            all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
-            minim = all_gids.min()
-            all_gids -= minim
-            mb.tag_set_data(tag, all_volumes, all_gids)
+        # tags = [self.tags['l1_ID'], self.tags['l2_ID']]
+        # for tag in tags:
+        #     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
+        #     minim = all_gids.min()
+        #     all_gids -= minim
+        #     mb.tag_set_data(tag, all_volumes, all_gids)
+
+        list_L1_ID -= list_L1_ID.min()
+        list_L2_ID -= list_L2_ID.min()
+
+        mb.tag_set_data(self.tags['l1_ID'], all_volumes, list_L1_ID)
+        mb.tag_set_data(self.tags['l2_ID'], all_volumes, list_L2_ID)
+        mb.tag_set_data(self.tags['l3_ID'], all_volumes, list_L3_ID)
