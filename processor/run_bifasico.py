@@ -432,10 +432,6 @@ if ADM:
     os.chdir(bifasico_sol_multiescala_dir)
 
     while verif:
-        contador += 1
-        if contador == 30:
-            contador = 0
-            import pdb; pdb.set_trace()
 
         t0 = time.time()
         t, loop = run(t, loop)

@@ -282,9 +282,6 @@ class sol_direta_bif:
             if volume in self.wells_injector or sat1 == 0.8:
                 sats_2[i] = sat1
                 continue
-            if sat1 == 0.8:
-                sats_2[i] = sat1
-                continue
             qw = all_qw[i]
 
             # if abs(qw) < lim:
@@ -304,8 +301,6 @@ class sol_direta_bif:
             else:
                 pass
 
-            # if self.loop > 1:
-            #     import pdb; pdb.set_trace()
             fi = all_fis[i]
             if fi == 0.0:
                 sats_2[i] = sat1
@@ -366,12 +361,12 @@ class sol_direta_bif:
         t2 = time.time()
         # print('tempo calculo saturacao loop_{0}: {1}'.format(loop, t2-t1))
         self.mb.tag_set_data(self.sat_tag, volumes, sats_2)
-        vols2 = rng.subtract(volumes, self.wells_injector)
-        satss = self.mb.tag_get_data(self.sat_tag, vols2, flat=True)
-        rr = np.where(satss > 0.8)[0]
-        print(rr)
-        if len(rr) > 0:
-            import pdb; pdb.set_trace()
+        # vols2 = rng.subtract(volumes, self.wells_injector)
+        # satss = self.mb.tag_get_data(self.sat_tag, vols2, flat=True)
+        # rr = np.where(satss > 0.8)[0]
+        # print(rr)
+        # if len(rr) > 0:
+        #     import pdb; pdb.set_trace()
         # self.mb.tag_set_data(self.sat_last_tag, volumes, all_sats)
         return 0
 
