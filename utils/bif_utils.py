@@ -74,6 +74,10 @@ class bifasico:
         self.cent_tag = mb.tag_get_handle('CENT')
         self.dfds_tag = mb.tag_get_handle('DFDS')
         self.finos_tag = mb.tag_get_handle('finos')
+        # self.gamav_tag = mb.tag_get_handle('GAMAV', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.gamav_tag = mb.tag_get_handle('GAMAV')
+        # self.gamaf_tag = mb.tag_get_handle('GAMAF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.gamaf_tag = mb.tag_get_handle('GAMAF')
         self.map_all_volumes = dict(zip(all_volumes, range(len(all_volumes))))
         self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
         self.mb = mb
@@ -96,6 +100,7 @@ class bifasico:
 
         self.hs = hs
         vol = hs[0]*hs[1]*hs[2]
+        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
         self.mb.tag_set_data(self.volume_tag, all_volumes, np.repeat(vol, len(all_volumes)))
         self.Vmin = vol
         historico = np.array(['vpi', 'tempo', 'prod_agua', 'prod_oleo', 'wor', 'dt'])
@@ -310,6 +315,7 @@ class bifasico:
         all_lamb_o = all_lamb_w.copy()
         all_lbt = all_lamb_w.copy()
         all_fw = all_lamb_w.copy()
+        all_gamav = all_lamb_w.copy()
 
         for i, sat in enumerate(all_sats):
             # volume = all_volumes[i]
@@ -326,11 +332,14 @@ class bifasico:
             all_lamb_o[i] = kro/self.mi_o
             all_lbt[i] = all_lamb_o[i] + all_lamb_w[i]
             all_fw[i] = all_lamb_w[i]/float(all_lbt[i])
+            gama = (self.gama_w*all_lamb_w[i] + self.gama_o*all_lamb_o[i])/(all_lbt[i])
+            all_gamav[i] = gama
 
         self.mb.tag_set_data(self.lamb_w_tag, all_volumes, all_lamb_w)
         self.mb.tag_set_data(self.lamb_o_tag, all_volumes, all_lamb_o)
         self.mb.tag_set_data(self.lbt_tag, all_volumes, all_lbt)
         self.mb.tag_set_data(self.fw_tag, all_volumes, all_fw)
+        self.mb.tag_set_data(self.gamav_tag, all_volumes, all_gamav)
 
     def set_mobi_faces_ini_dep0(self, all_volumes, all_faces_in):
         lim = 1e-5
@@ -399,12 +408,14 @@ class bifasico:
         all_fw = self.mb.tag_get_data(self.fw_tag, all_volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, all_volumes, flat=True)
         all_ks = self.mb.tag_get_data(self.perm_tag, all_volumes)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, all_volumes, flat=True)
 
         all_keqs = self.mb.tag_get_data(self.keq_tag, all_faces_in, flat=True)
         all_mobi_in_faces = np.zeros(len(all_faces_in))
         all_s_gravs = all_mobi_in_faces.copy()
         all_fw_in_face = all_mobi_in_faces.copy()
         all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
         Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
 
         for i, face in enumerate(all_faces_in):
@@ -417,6 +428,8 @@ class bifasico:
             fw1 = all_fw[id1]
             sat0 = all_sats[id0]
             sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
 
             k0 = all_ks[id0].reshape([3,3])
             k1 = all_ks[id1].reshape([3,3])
@@ -426,6 +439,7 @@ class bifasico:
             k0 = np.dot(np.dot(k0, uni), uni)
             k1 = np.dot(np.dot(k1, uni), uni)
             h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
             if abs(sat0-sat1) < lim:
                 all_dfds[i] = 0.0
             else:
@@ -433,19 +447,25 @@ class bifasico:
             if elems[0] in self.wells_injector:
                 all_mobi_in_faces[i] = k0*lbt0
                 all_fw_in_face[i] = fw0
+                gamaf = gama0
             elif elems[1] in self.wells_injector:
                 all_mobi_in_faces[i] = k1*lbt1
                 all_fw_in_face[i] = fw1
+                gamaf = gama1
             else:
                 all_mobi_in_faces[i] = ((k0 + k1)/2.0)*(lbt0 + lbt1)/2.0
                 all_fw_in_face[i] = (fw0 + fw1)/2.0
-            all_mobi_in_faces[i] /= h
-            all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+                gamaf = (gama0 + gama1)/2.0
+            all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
 
         self.mb.tag_set_data(self.mobi_in_faces_tag, all_faces_in, all_mobi_in_faces)
         self.mb.tag_set_data(self.s_grav_tag, all_faces_in, all_s_gravs)
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, all_faces_in, all_gamaf)
 
     def set_mobi_faces_dep0(self, volumes, faces, finos0=None):
 
@@ -543,6 +563,7 @@ class bifasico:
         all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
         all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
         # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
         all_centroids = self.all_centroids
         all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
@@ -553,6 +574,7 @@ class bifasico:
         all_s_gravs = all_mobi_in_faces.copy()
         all_fw_in_face = all_mobi_in_faces.copy()
         all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
         Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
 
         for i, face in enumerate(faces):
@@ -568,6 +590,9 @@ class bifasico:
             fw1 = all_fws[id1]
             sat0 = all_sats[id0]
             sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
             k0 = all_ks[id0].reshape([3,3])
             k1 = all_ks[id1].reshape([3,3])
             direction = all_centroids[id1] - all_centroids[id0]
@@ -576,6 +601,7 @@ class bifasico:
             k0 = np.dot(np.dot(k0, uni), uni)
             k1 = np.dot(np.dot(k1, uni), uni)
             h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
 
             if abs(sat0 - sat1) < lim:
                 all_dfds[i] = 0.0
@@ -588,24 +614,32 @@ class bifasico:
             if elems[0] in self.wells_injector:
                 all_mobi_in_faces[i] = k0*lbt0
                 all_fw_in_face[i] = fw0
+                gamaf = gama0
                 # continue
             elif elems[1] in self.wells_injector:
                 all_mobi_in_faces[i] = k1*lbt1
                 all_fw_in_face[i] = fw1
+                gamaf = gama1
                 # continue
             elif flux_in_face < 0:
                 all_mobi_in_faces[i] = k0*(lbt0)
                 all_fw_in_face[i] = fw0
+                gamaf = gama0
             else:
                 all_mobi_in_faces[i] = k1*(lbt1)
                 all_fw_in_face[i] = fw1
-            all_mobi_in_faces[i] /= h
-            all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+                gamaf = gama1
+
+            all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
 
         self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_mobi_in_faces)
         self.mb.tag_set_data(self.s_grav_tag, faces, all_s_gravs)
         self.mb.tag_set_data(self.fw_in_faces_tag, faces, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, faces, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, faces, all_gamaf)
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 

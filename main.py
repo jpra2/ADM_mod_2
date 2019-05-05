@@ -23,6 +23,12 @@ if deletar:
     shutil.rmtree(sol_direta)
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
+    os.chdir(sol_direta)
+    with open('__init__.py', 'w') as f:
+        pass
+    os.chdir(sol_multi)
+    with open('__init__.py', 'w') as f:
+        pass
 
     ### deletar arquivos no output
     bifasico_dir = os.path.join(output_dir, 'bifasico')
@@ -32,6 +38,12 @@ if deletar:
     shutil.rmtree(sol_direta)
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
+    os.chdir(sol_direta)
+    with open('__init__.py', 'w') as f:
+        pass
+    os.chdir(sol_multi)
+    with open('__init__.py', 'w') as f:
+        pass
 
     if somente_deletar:
         sys.exit(0)

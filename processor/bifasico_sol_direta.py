@@ -65,6 +65,8 @@ class sol_direta_bif:
         self.dfds_tag = mb.tag_get_handle('DFDS')
         self.finos_tag = mb.tag_get_handle('finos')
         self.pf_tag = mb.tag_get_handle('PF')
+        self.gamav_tag = mb.tag_get_handle('GAMAV')
+        self.gamaf_tag = mb.tag_get_handle('GAMAF')
         self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
         self.map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
         self.mb = mb
@@ -80,6 +82,7 @@ class sol_direta_bif:
         mins = coords.min(axis=0)
         hs = maxs - mins
         self.hs = hs
+        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
 
         # hs[0] = conv.pe_to_m(hs[0])
         # hs[1] = conv.pe_to_m(hs[1])
@@ -142,6 +145,7 @@ class sol_direta_bif:
     def calculate_total_flux(self, volumes, faces):
 
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        all_gamaf = self.mb.tag_get_data(self.gamaf_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
         ps = self.mb.tag_get_data(self.pf_tag, volumes, flat=True)
 
@@ -151,11 +155,13 @@ class sol_direta_bif:
         fluxo_grav_volumes = np.zeros(len(volumes))
 
         for i, face in enumerate(faces):
+            gamaf = all_gamaf[i]
             elems = self.mb.get_adjacencies(face, 3)
             id0 = self.map_volumes[elems[0]]
             id1 = self.map_volumes[elems[1]]
             mobi = mobi_in_faces[i]
-            s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            # s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            s_grav = gamaf*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
             fw = fws_faces[i]
             flux = (ps[id1] - ps[id0])*mobi
             if self.gravity == True:
@@ -334,11 +340,11 @@ class sol_direta_bif:
                 # return 2
                 return 1
 
-            elif sat > sat1 + 0.2:
-                print('sat > sat1 + 0.2')
-                print(f'sat: {sat}')
-                print(f'sat1: {sat1}\n')
-                return 1
+            # elif sat > sat1 + 0.2:
+            #     print('sat > sat1 + 0.2')
+            #     print(f'sat: {sat}')
+            #     print(f'sat1: {sat1}\n')
+            #     return 1
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:
@@ -562,6 +568,7 @@ class sol_direta_bif:
         all_lamb_o = all_lamb_w.copy()
         all_lbt = all_lamb_w.copy()
         all_fw = all_lamb_w.copy()
+        all_gamav = all_lamb_w.copy()
 
         for i, sat in enumerate(all_sats):
             krw, kro = self.pol_interp(sat)
@@ -578,11 +585,13 @@ class sol_direta_bif:
             all_lamb_o[i] = kro/self.mi_o
             all_lbt[i] = all_lamb_o[i] + all_lamb_w[i]
             all_fw[i] = all_lamb_w[i]/float(all_lbt[i])
+            all_gamav[i] = (self.gama_w*all_lamb_w[i] + self.gama_o*all_lamb_o[i])/all_lbt[i]
 
         self.mb.tag_set_data(self.lamb_w_tag, all_volumes, all_lamb_w)
         self.mb.tag_set_data(self.lamb_o_tag, all_volumes, all_lamb_o)
         self.mb.tag_set_data(self.lbt_tag, all_volumes, all_lbt)
         self.mb.tag_set_data(self.fw_tag, all_volumes, all_fw)
+        self.mb.tag_set_data(self.gamav_tag, all_volumes, all_gamav)
 
     def set_mobi_faces_dep0(self, volumes, faces):
         lim = 1e-5
@@ -669,6 +678,7 @@ class sol_direta_bif:
         all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
         all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
         all_ks =self.mb.tag_get_data(self.perm_tag, volumes)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
 
         all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
         all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
@@ -676,6 +686,7 @@ class sol_direta_bif:
         all_s_gravs = all_mobi_in_faces.copy()
         all_fw_in_face = all_mobi_in_faces.copy()
         all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
 
         for i, face in enumerate(faces):
             elems = self.mb.get_adjacencies(face, 3)
@@ -689,6 +700,9 @@ class sol_direta_bif:
             fw1 = all_fws[id1]
             sat0 = all_sats[id0]
             sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
             k0 = all_ks[id0].reshape([3,3])
             k1 = all_ks[id1].reshape([3,3])
             direction = all_centroids[id1] - all_centroids[id0]
@@ -697,6 +711,7 @@ class sol_direta_bif:
             k0 = np.dot(np.dot(k0, uni), uni)
             k1 = np.dot(np.dot(k1, uni), uni)
             h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
 
             if abs(sat0 - sat1) < lim:
                 all_dfds[i] = 0.0
@@ -709,24 +724,31 @@ class sol_direta_bif:
             if elems[0] in self.wells_injector:
                 all_mobi_in_faces[i] = k0*lbt0
                 all_fw_in_face[i] = fw0
+                gamaf = gama0
                 # continue
             elif elems[1] in self.wells_injector:
                 all_mobi_in_faces[i] = k1*lbt1
                 all_fw_in_face[i] = fw1
+                gamaf = gama1
                 # continue
             elif flux_in_face < 0:
                 all_mobi_in_faces[i] = k0*(lbt0)
                 all_fw_in_face[i] = fw0
+                gamaf = gama0
             else:
                 all_mobi_in_faces[i] = k1*(lbt1)
                 all_fw_in_face[i] = fw1
-            all_mobi_in_faces[i] /= h
-            all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+                gamaf = gama1
+            all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
 
         self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_mobi_in_faces)
         self.mb.tag_set_data(self.s_grav_tag, faces, all_s_gravs)
         self.mb.tag_set_data(self.fw_in_faces_tag, faces, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, faces, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, faces, all_gamaf)
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
