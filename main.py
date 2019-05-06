@@ -80,10 +80,14 @@ def definir():
 # definir()
 
 if bifasico == False:
-    loader = importlib.machinery.SourceFileLoader('solucao_adm_mono_v01', processor_dir + '/solucao_adm_mono_v01.py')
-    loader.load_module('solucao_adm_mono_v01')
+    # loader = importlib.machinery.SourceFileLoader('solucao_adm_mono_v01', processor_dir + '/solucao_adm_mono_v01.py')
+    # loader.load_module('solucao_adm_mono_v01')
     # loader = importlib.machinery.SourceFileLoader('solucao_adm_mono_v02', processor_dir + '/solucao_adm_mono_v02.py')
     # loader.load_module('solucao_adm_mono_v02')
+    from processor import solucao_adm_mono_v01
+
 else:
-    loader = importlib.machinery.SourceFileLoader('run_bifasico', processor_dir + '/run_bifasico.py')
-    loader.load_module('run_bifasico')
+    # loader = importlib.machinery.SourceFileLoader('run_bifasico', processor_dir + '/run_bifasico.py')
+    # loader.load_module('run_bifasico')
+
+    from processor import run_bifasico

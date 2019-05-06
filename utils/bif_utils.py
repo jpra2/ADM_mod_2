@@ -37,6 +37,7 @@ import importlib.machinery
 
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
+
         self.cfl_ini = 0.9
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
@@ -64,16 +65,9 @@ class bifasico:
         self.total_time = float(data_loaded['dados_bifasico']['total_time'])
         # self.gravity = mb.tag_get_data(mb.tag_get_handle('GRAVITY'), 0, flat=True)[0]
         self.gravity = data_loaded['gravity']
-        try:
-            self.volume_tag = mb.tag_get_handle('VOLUME')
-        except:
-            self.volume_tag = mb.tag_get_handle('VOLUME', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        try:
-            self.sat_tag = mb.tag_get_handle('SAT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        except:
-            self.sat_tag = mb.tag_get_handle('SAT')
+        self.volume_tag = mb.tag_get_handle('VOLUME', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.sat_tag = mb.tag_get_handle('SAT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.sat_last_tag = mb.tag_get_handle('SAT_LAST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
         # self.fw_tag = mb.tag_get_handle('FW')
         self.fw_tag = mb.tag_get_handle('FW', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         # self.lamb_w_tag = mb.tag_get_handle('LAMB_W')

@@ -13,6 +13,7 @@ from utils import prolongation_ams as prol_tpfa
 from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
+from processor import def_intermediarios as def1
 
 # import solucao_adm_bifasico.solucao_adm_bifasico as sol_adm_bif
 
@@ -29,7 +30,7 @@ out_bif_dir = os.path.join(output_dir, 'bifasico')
 out_bif_soldir_dir =  os.path.join(out_bif_dir, 'sol_direta')
 out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
 
-import importlib.machinery
+# import importlib.machinery
 
 # loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
 # utpy = loader.load_module('pymoab_utils')
@@ -40,14 +41,28 @@ import importlib.machinery
 # loader = importlib.machinery.SourceFileLoader('malha_adm', parent_dir + '/malha_adm.py')
 # adm_mesh = loader.load_module('malha_adm')
 
+def1.create_names_tags()
+
 mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded = utpy.load_adm_mesh()
-tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
+all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+# tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
+tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+
+########################################
+##alterar
+
+def1.def_inter(mb, tags_1)
+def1.injector_producer(mb)
+def1.cent(mb, mtu, all_volumes)
+
+#######################################
+
 os.chdir(flying_dir)
 faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
 intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
-all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+
 
 tags = [tags_1['l1_ID'], tags_1['l2_ID']]
 for tag in tags:
@@ -55,11 +70,10 @@ for tag in tags:
     minim = min(all_gids)
     all_gids -= minim
     mb.tag_set_data(tag, all_volumes, all_gids)
-
 vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
-loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
+# loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
 # bif_utils = loader.load_module('bif_utils').bifasico(mb, mtu, all_volumes)
 bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
 bif_utils.gravity = data_loaded['gravity']
@@ -361,6 +375,8 @@ def run_2(t):
     dt = t1 - t0
     tend = time.time()
     dtt = tend - tini
+    mb.write_file('teste.vtk', [vv])
+    import pdb; pdb.set_trace()
     # print(f'tempo nv0 fluxo {dt}\n')
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)

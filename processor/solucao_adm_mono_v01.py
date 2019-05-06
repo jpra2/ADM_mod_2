@@ -23,7 +23,7 @@ utpy = loader.load_module('pymoab_utils')
 loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
 oth = loader.load_module('others_utils').OtherUtils
 
-
+import pdb; pdb.set_trace()
 os.chdir(input_dir)
 with open("inputs.yaml", 'r') as stream:
     data_loaded = yaml.load(stream)
