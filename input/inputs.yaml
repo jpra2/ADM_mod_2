@@ -1,4 +1,4 @@
-input_file: '27x27x27'
+input_file: '28x28x30'
 
 gravity: True
 # adicionar o efeito da gravidade

@@ -21,7 +21,7 @@ loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/othe
 oth = loader.load_module('others_utils').OtherUtils
 
 class sol_adm_bifasico:
-    def __init__(self, mb, dict_tags, gravity, all_volumes):
+    def __init__(self, mb, dict_tags, gravity, all_volumes, data_loaded):
         self.internos=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([0]))
         self.faces=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([1]))
         self.arestas=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([2]))
@@ -44,7 +44,8 @@ class sol_adm_bifasico:
 
         self.gravity = gravity
         self.AMS_TO_ADM, self.COL_TO_ADM_2, self.G, self.OR1_AMS, self.OR2_AMS = self.get_AMS_TO_ADM_dict(mb, dict_tags, all_volumes)
-        self.MPFA = mb.tag_get_data(dict_tags['MPFA'], 0, flat=True)[0]
+        # self.MPFA = mb.tag_get_data(dict_tags['MPFA'], 0, flat=True)[0]
+        self.MPFA = data_loaded['MPFA']
 
     def get_b_ini(self, mb, dict_tags, all_volumes):
         lines = []

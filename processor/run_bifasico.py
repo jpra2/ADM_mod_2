@@ -41,6 +41,11 @@ import importlib.machinery
 # adm_mesh = loader.load_module('malha_adm')
 
 mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded = utpy.load_adm_mesh()
+tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
+os.chdir(flying_dir)
+faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
+intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
+
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
@@ -56,14 +61,14 @@ mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
 loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
 # bif_utils = loader.load_module('bif_utils').bifasico(mb, mtu, all_volumes)
-bif_utils = bif_utils.bifasico(mb, mtu, all_volumes)
+bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
 bif_utils.gravity = data_loaded['gravity']
 # loader = importlib.machinery.SourceFileLoader('sol_adm_bifasico', parent_dir + '/sol_adm_bifasico.py')
 # sol_adm_bif = loader.load_module('sol_adm_bifasico')
 
 oth.gravity = bif_utils.gravity
 oth1 = oth(mb, mtu)
-sol_adm = sol_adm_bif.sol_adm_bifasico(mb, tags_1, oth.gravity, all_volumes)
+sol_adm = sol_adm_bif.sol_adm_bifasico(mb, tags_1, oth.gravity, all_volumes, data_loaded)
 all_ids_reord = mb.tag_get_data(tags_1['ID_reord_tag'], all_volumes, flat=True)
 map_global = dict(zip(all_volumes, all_ids_reord))
 boundary_faces = mb.tag_get_data(tags_1['FACES_BOUNDARY'], 0, flat=True)[0]
@@ -99,18 +104,19 @@ for i in range(len(meshsets_levels)):
 
 ####apagar
 # mi = 0.0003
-mi = 1.0
-bif_utils.mi_w = mi #Paxs
-bif_utils.mi_o = mi
+# mi = 1.0
+# bif_utils.mi_w = mi #Paxs
+# bif_utils.mi_o = mi
 bif_utils.set_sat_in(all_volumes)
 bif_utils.set_lamb(all_volumes)
+tags_1['S_GRAV'] = bif_utils.s_grav_tag
 # kk = 1e-30
-k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-for v in all_volumes:
-
-    # k = mb.tag_get_data(tags_1['PERM'], v, flat=True)
-    # k = conv.milidarcy_to_m2(k)
-    mb.tag_set_data(tags_1['PERM'], v, k)
+# k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+# for v in all_volumes:
+#
+#     # k = mb.tag_get_data(tags_1['PERM'], v, flat=True)
+#     # k = conv.milidarcy_to_m2(k)
+#     mb.tag_set_data(tags_1['PERM'], v, k)
 
 def get_ls(all_volumes):
     v0 = all_volumes[0]
@@ -156,6 +162,8 @@ def set_keq(all_volumes, faces_in, tags):
     mb.tag_set_data(tags['K_EQ'], faces_in, keqs)
 
 
+
+
 # set_keq(all_volumes, faces_in, tags_1)
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
@@ -172,7 +180,6 @@ k01 = 1e-3
 # z_elems_d = -1*np.array([mtu.get_average_position([v])[2] for v in sol_adm.volumes_d])
 # delta_z = z_elems_d + Lz
 # press_prod = bif_utils.gama*(delta_z) + press_prod
-# import pdb; pdb.set_trace()
 # press_prod = conv.psi_to_Pa(press_prod) #Pascal
 # mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, np.repeat(press_prod, len(sol_adm.volumes_d)))
 # mb.tag_set_data(tags_1['P'], sol_adm.volumes_d, press_prod)
@@ -183,15 +190,11 @@ finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID
 # meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
 
 
-# import pdb; pdb.set_trace()
 
 def run_PMS(n1_adm, n2_adm, loop):
 
     print('entrou run_PMS')
     t0 = time.time()
-
-    # if loop > 0:
-    #     Pms2_ant = mb.tag_get_data(tags_1['PMS2'], sol_adm.wirebasket_elems, flat=True)
 
     As, s_grav = sol_adm.get_AS_structured_v2(mb, tags_1, faces_in, all_volumes, bif_utils.mobi_in_faces_tag, map_global)
     # with io.open('As.yaml', 'w', encoding='utf8') as outfile:
@@ -202,7 +205,6 @@ def run_PMS(n1_adm, n2_adm, loop):
     #     As = yaml.load(stream)
     # s_grav = np.load('s_grav.npy')
     # tmod = oth.get_Tmod_by_sparse_wirebasket_matrix(As['Tf'], wirebasket_numbers)
-    # import pdb; pdb.set_trace()
 
     # OP1_AMS = oth.get_op_by_wirebasket_Tf(As['Tf'], wirebasket_numbers)
 
@@ -212,8 +214,8 @@ def run_PMS(n1_adm, n2_adm, loop):
 
     # OP1_AMS = sol_adm.get_OP1_AMS_structured(As)
     #
-    OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
-
+    # OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
+    OP1_AMS = prol_tpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, sol_adm.ni, sol_adm.nf, bif_utils.mobi_in_faces_tag, As)
     OP1_ADM, OR1_ADM = sol_adm.organize_OP1_ADM(mb, OP1_AMS, all_volumes, tags_1)
 
     # sp.save_npz('OP1_AMS', OP1_AMS)
@@ -289,7 +291,6 @@ def run_PMS(n1_adm, n2_adm, loop):
     # T1_ADM = OR1_ADM.dot(As['Tf'])
     # T1_ADM = T1_ADM.dot(OP1_ADM)
 
-    # import pdb; pdb.set_trace()
     t1 = time.time()
     dt = t1-t0
     # print(f'run pms {dt} \n')
@@ -496,8 +497,6 @@ elif ADM == False:
     bifasico.gravity = bif_utils.gravity
     bifasico.mi_w = bif_utils.mi_w #Paxs
     bifasico.mi_o = bif_utils.mi_o
-
-    # import pdb; pdb.set_trace()
 
     while verif:
 
