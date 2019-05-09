@@ -10,6 +10,7 @@ import conversao as conv
 from utils.others_utils import OtherUtils as oth
 
 
+
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
@@ -23,48 +24,60 @@ import importlib.machinery
 
 class sol_direta_bif:
 
-    def __init__(self, mb, mtu, all_volumes):
+    def __init__(self, mb, mtu, all_volumes, data_loaded):
         self.k2 = 0.9
         self.cfl_ini = self.k2
         self.cfl = self.k2
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
-        self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
-        self.mi_o = mb.tag_get_data(mb.tag_get_handle('MI_O'), 0, flat=True)[0]
-        self.gama_w = mb.tag_get_data(mb.tag_get_handle('GAMA_W'), 0, flat=True)[0]
-        self.gama_o = mb.tag_get_data(mb.tag_get_handle('GAMA_O'), 0, flat=True)[0]
-        self.Sor = mb.tag_get_data(mb.tag_get_handle('SOR'), 0, flat=True)[0]
-        self.Swc = mb.tag_get_data(mb.tag_get_handle('SWC'), 0, flat=True)[0]
-        self.nw = mb.tag_get_data(mb.tag_get_handle('NW'), 0, flat=True)[0]
-        self.no = mb.tag_get_data(mb.tag_get_handle('NO'), 0, flat=True)[0]
-        self.tz = mb.tag_get_data(mb.tag_get_handle('TZ'), 0, flat=True)[0]
-        self.loops = mb.tag_get_data(mb.tag_get_handle('LOOPS'), 0, flat=True)[0]
-        self.total_time = mb.tag_get_data(mb.tag_get_handle('TOTAL_TIME'), 0, flat=True)[0]
-        self.gravity = mb.tag_get_data(mb.tag_get_handle('GRAVITY'), 0, flat=True)[0]
-        self.volume_tag = mb.tag_get_handle('VOLUME')
-        self.sat_tag = mb.tag_get_handle('SAT')
+        # self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
+        self.mi_w = float(data_loaded['dados_bifasico']['mi_w'])
+        # self.mi_o = mb.tag_get_data(mb.tag_get_handle('MI_O'), 0, flat=True)[0]
+        self.mi_o = float(data_loaded['dados_bifasico']['mi_o'])
+        # self.gama_w = mb.tag_get_data(mb.tag_get_handle('GAMA_W'), 0, flat=True)[0]
+        self.gama_w = float(data_loaded['dados_bifasico']['gama_w'])
+        # self.gama_o = mb.tag_get_data(mb.tag_get_handle('GAMA_O'), 0, flat=True)[0]
+        self.gama_o = float(data_loaded['dados_bifasico']['gama_o'])
+        # self.Sor = mb.tag_get_data(mb.tag_get_handle('SOR'), 0, flat=True)[0]
+        self.Sor = float(data_loaded['dados_bifasico']['Sor'])
+        # self.Swc = mb.tag_get_data(mb.tag_get_handle('SWC'), 0, flat=True)[0]
+        self.Swc = float(data_loaded['dados_bifasico']['Swc'])
+        # self.nw = mb.tag_get_data(mb.tag_get_handle('NW'), 0, flat=True)[0]
+        self.nw = float(data_loaded['dados_bifasico']['nwater'])
+        # self.no = mb.tag_get_data(mb.tag_get_handle('NO'), 0, flat=True)[0]
+        self.no = float(data_loaded['dados_bifasico']['noil'])
+        # self.tz = mb.tag_get_data(mb.tag_get_handle('TZ'), 0, flat=True)[0]
+        # self.loops = mb.tag_get_data(mb.tag_get_handle('LOOPS'), 0, flat=True)[0]
+        self.loops = int(data_loaded['dados_bifasico']['loops'])
+        # self.total_time = mb.tag_get_data(mb.tag_get_handle('TOTAL_TIME'), 0, flat=True)[0]
+        self.total_time = float(data_loaded['dados_bifasico']['total_time'])
+        # self.gravity = mb.tag_get_data(mb.tag_get_handle('GRAVITY'), 0, flat=True)[0]
+        self.gravity = data_loaded['gravity']
+        self.volume_tag = mb.tag_get_handle('VOLUME', 1,  types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.sat_tag = mb.tag_get_handle('SAT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.sat_last_tag = mb.tag_get_handle('SAT_LAST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        self.fw_tag = mb.tag_get_handle('FW')
-        self.lamb_w_tag = mb.tag_get_handle('LAMB_W')
-        self.lamb_o_tag = mb.tag_get_handle('LAMB_O')
-        self.lbt_tag = mb.tag_get_handle('LBT')
-        self.keq_tag = mb.tag_get_handle('K_EQ')
-        self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES')
-        self.fw_in_faces_tag = mb.tag_get_handle('FW_IN_FACES')
+        self.sat_last_tag = mb.tag_get_handle('SAT_LAST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.fw_tag = mb.tag_get_handle('FW', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.lamb_w_tag = mb.tag_get_handle('LAMB_W', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.lamb_o_tag = mb.tag_get_handle('LAMB_O', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.lbt_tag = mb.tag_get_handle('LBT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.keq_tag = mb.tag_get_handle('K_EQ', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.fw_in_faces_tag = mb.tag_get_handle('FW_IN_FACES', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.phi_tag = mb.tag_get_handle('PHI')
-        self.total_flux_tag = mb.tag_get_handle('TOTAL_FLUX')
-        self.flux_w_tag = mb.tag_get_handle('FLUX_W')
-        self.flux_in_faces_tag = mb.tag_get_handle('FLUX_IN_FACES')
+        self.total_flux_tag = mb.tag_get_handle('TOTAL_FLUX', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.flux_w_tag = mb.tag_get_handle('FLUX_W', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.flux_in_faces_tag = mb.tag_get_handle('FLUX_IN_FACES', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.wells_injector = mb.tag_get_data(mb.tag_get_handle('WELLS_INJECTOR'), 0, flat=True)
         self.wells_injector = mb.get_entities_by_handle(self.wells_injector[0])
         self.wells_producer = mb.tag_get_data(mb.tag_get_handle('WELLS_PRODUCER'), 0, flat=True)
         self.wells_producer = mb.get_entities_by_handle(self.wells_producer[0])
-        self.s_grav_tag = mb.tag_get_handle('S_GRAV')
+        self.s_grav_tag = mb.tag_get_handle('S_GRAV', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.s_grav_volume_tag = mb.tag_get_handle('S_GRAV_VOLUME', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.cent_tag = mb.tag_get_handle('CENT')
-        self.dfds_tag = mb.tag_get_handle('DFDS')
+        self.dfds_tag = mb.tag_get_handle('DFDS', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.finos_tag = mb.tag_get_handle('finos')
-        self.pf_tag = mb.tag_get_handle('PF')
+        self.pf_tag = mb.tag_get_handle('PF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.gamav_tag = mb.tag_get_handle('GAMAV')
         self.gamaf_tag = mb.tag_get_handle('GAMAF')
         self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
@@ -274,6 +287,7 @@ class sol_direta_bif:
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
+        self.mb.tag_set_data(self.sat_last_tag, volumes, all_sats)
         all_volumes = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
         all_fw = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
         all_total_flux = self.mb.tag_get_data(self.total_flux_tag, volumes, flat=True)

@@ -6,7 +6,8 @@ import os
 import scipy
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find, lil_matrix
 import yaml
-
+from utils import prolongation_ams as proltpfa
+from processor import def_intermediarios as definter
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -17,13 +18,16 @@ output_dir = os.path.join(parent_parent_dir, 'output')
 bifasico_dir = os.path.join(flying_dir, 'bifasico')
 sol_direta_dir =  os.path.join(bifasico_dir, 'sol_direta')
 
+os.chdir(flying_dir)
+intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
+faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
+
 import importlib.machinery
 loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
 utpy = loader.load_module('pymoab_utils')
 loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
 oth = loader.load_module('others_utils').OtherUtils
 
-import pdb; pdb.set_trace()
 os.chdir(input_dir)
 with open("inputs.yaml", 'r') as stream:
     data_loaded = yaml.load(stream)
@@ -41,9 +45,18 @@ os.chdir(parent_dir)
 
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
+
 dict_tags = utpy.get_all_tags_2(mb, list_names_tags)
+dict_tags['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
 name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
-oth.gravity = mb.tag_get_data(dict_tags['GRAVITY'], 0, flat=True)
+oth.gravity = data_loaded['gravity']
+
+############
+#apagar
+# kf = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+# k1 = 1.0
+# mb.tag_set_data(dict_tags['K_EQ'], all_faces, np.repeat(k1, len(all_faces)))
+# mb.tag_set_data(dict_tags['PERM'], all_volumes, np.repeat(kf, len(all_volumes)))
 
 
 tempo0_ADM = time.time()
@@ -74,10 +87,13 @@ nni=ni
 nnf=nni+nf
 nne=nnf+na
 nnv=nne+nv
-
+gama = data_loaded['dados_monofasico']['gama']
+mi = data_loaded['dados_monofasico']['mi']
 volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['P']]), np.array([None]))
 volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['Q']]), np.array([None]))
 
+if oth.gravity:
+    definter.set_p_with_gravity(mb, mtu, volumes_d, dict_tags['P'], all_nodes, gama)
 ln=[]
 cn=[]
 dn=[]
@@ -111,7 +127,6 @@ for n in volumes_n:
     #b[ID_global]=vazao
 # del(b)
 b=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),1))
-
 bn=csc_matrix((dn,(ln,cn)),shape=(len(all_volumes),1))
 
 lii=[]
@@ -146,6 +161,8 @@ faces_in = rng.subtract(all_faces, boundary_faces)
 all_keqs = mb.tag_get_data(dict_tags['K_EQ'], faces_in, flat=True)
 map_all_keqs = dict(zip(faces_in, all_keqs))
 
+definter.converter_keq(mb, dict_tags['K_EQ'], faces_in)
+
 ID_reordenado_tag = dict_tags['ID_reord_tag']
 print("def As")
 ty=time.time()
@@ -168,8 +185,6 @@ for i, f in enumerate(faces_in):
     data_sgr.append(s_grav)
     b_s_grav[Gid_1] -= s_grav
     b_s_grav[Gid_2] += s_grav
-
-
 
     if Gid_1<ni and Gid_2<ni:
         lii.append(Gid_1)
@@ -307,6 +322,37 @@ Aev=csc_matrix((dev,(lev,cev)),shape=(na,nv))
 Avv=csc_matrix((dvv,(lvv,cvv)),shape=(nv,nv))
 
 Ivv=scipy.sparse.identity(nv)
+As = dict()
+As['Aii'] = Aii
+As['Aif'] = Aif
+As['Aff'] = Aff
+As['Afe'] = Afe
+As['Aee'] = Aee
+As['Aev'] = Aev
+As['Avv'] = Avv
+As['Ivv'] = Ivv
+
+ids_volumes_tag = mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+mb.tag_set_data(ids_volumes_tag, all_volumes, np.arange(len(all_volumes)))
+gamaf_tag = mb.tag_get_handle('GAMAF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+mb.tag_set_data(gamaf_tag, faces_in, np.repeat(gama, len(faces_in)))
+sgravf_tag = mb.tag_get_handle('SGRAVF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+Adjs = np.array([np.array(mb.get_adjacencies(f, 3)) for f in faces_in])
+all_centroids = mb.tag_get_data(dict_tags['CENT'], all_volumes)
+map_vols = dict(zip(all_volumes, np.arange(len(all_volumes))))
+ids_0 = np.array([mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
+ids_1 = np.array([mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
+s_gravsf = definter.set_s_grav_faces(mb, dict_tags['K_EQ'], all_volumes, all_centroids, faces_in, gamaf_tag, sgravf_tag, ids_0, ids_1)
+ids_reord_elems0 = np.array([mb.tag_get_data(ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
+ids_reord_elems1 = np.array([mb.tag_get_data(ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
+
+fonte_grav = np.zeros(len(all_volumes))
+fonte_grav[ids_reord_elems0] -= s_gravsf
+fonte_grav[ids_reord_elems1] += s_gravsf
+b_s_grav = fonte_grav
+
+
+
 
 # volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['P']]), np.array([None]))
 # volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['Q']]), np.array([None]))
@@ -347,17 +393,7 @@ Ivv=scipy.sparse.identity(nv)
 #
 # bn=csc_matrix((dn,(ln,cn)),shape=(len(all_volumes),1))
 #
-if oth.gravity == True:
 
-    ids_volumes_d = mb.tag_get_data(ID_reordenado_tag, volumes_d, flat=True)
-    b_s_grav[ids_volumes_d] = np.zeros(len(volumes_d))
-    lines = np.arange(len(all_volumes))
-    cols = np.repeat(0, len(all_volumes))
-    data = b_s_grav
-    b_s_grav = csc_matrix((data,(lines,cols)),shape=(len(all_volumes),1))
-    b += b_s_grav
-
-#
 # ln=[]
 # cn=[]
 # dn=[]
@@ -397,20 +433,20 @@ ty=time.time()
 #th=time.time()
 #M2=-linalg.inv(Aee)*Aev
 #print(time.time()-th,"Direto")
-
 invAee=oth.lu_inv(Aee)
-M2=-invAee*Aev
-P=vstack([M2,Ivv]) #P=np.concatenate((-np.dot(np.linalg.inv(Aee),Aev),Ivv), axis=0)
-
+# M2=-invAee*Aev
+# P=vstack([M2,Ivv]) #P=np.concatenate((-np.dot(np.linalg.inv(Aee),Aev),Ivv), axis=0)
+#
 invAff=oth.lu_inv(Aff)
-M3=-invAff*Afe*M2
-del(M2)
-P=vstack([M3,P])   #P=np.concatenate((-np.dot(np.linalg.inv(Aff),np.dot(Afe,P[0:na,0:nv])),P), axis=0)
-
+# M3=-invAff*Afe*M2
+# del(M2)
+# P=vstack([M3,P])   #P=np.concatenate((-np.dot(np.linalg.inv(Aff),np.dot(Afe,P[0:na,0:nv])),P), axis=0)
+#
 invAii=oth.lu_inv(Aii)
-P=vstack([-invAii*Aif*M3,P]) ##P=np.concatenate((np.dot(-np.linalg.inv(Aii),np.dot(Aif,P[0:nf,0:nv])),P),axis=0)
-del(M3)
-print("took to get_OP_AMS",time.time()-ty)
+# P=vstack([-invAii*Aif*M3,P]) ##P=np.concatenate((np.dot(-np.linalg.inv(Aii),np.dot(Aif,P[0:nf,0:nv])),P),axis=0)
+# del(M3)
+# print("took to get_OP_AMS",time.time()-ty)
+P = proltpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, ni, nf, dict_tags['K_EQ'], As)
 
 b_ams1_wire=b
 b_ams1_int=b_ams1_wire[0:ni,0]
@@ -643,7 +679,7 @@ for f in all_faces:
 
 T=csc_matrix((data,(lines,cols)),shape=(len(all_volumes),len(all_volumes)))
 
-T_orig=T
+T_orig=T.copy()
 t_assembly=time.time()-t_ass
 
 #----------------------------------------------------
@@ -731,7 +767,8 @@ OR_AMS_2=csc_matrix((data,(lines,cols)),shape=(nver,nv))
 
 W_AMS=G*T_AMS*G.transpose()
 
-MPFA_NO_NIVEL_2=mb.tag_get_data(dict_tags['MPFA'], 0, flat=True)[0]
+# MPFA_NO_NIVEL_2=mb.tag_get_data(dict_tags['MPFA'], 0, flat=True)[0]
+MPFA_NO_NIVEL_2=data_loaded['MPFA']
 
 #-------------------------------------------------------------------------------
 nv1=nv
@@ -1026,6 +1063,17 @@ ID_ADM_2=mb.tag_get_data(L2_ID_tag,volumes_d, flat=True)
 T[ID_global]=scipy.sparse.csc_matrix((len(ID_global),T.shape[0]))
 T[ID_global,ID_global]=np.ones(len(ID_global))
 
+if oth.gravity == True:
+
+    ids_volumes_d = mb.tag_get_data(ID_reordenado_tag, volumes_d, flat=True)
+    values = mb.tag_get_data(dict_tags['P'], volumes_d, flat=True)
+    b_s_grav[ids_volumes_d] = values
+    lines = np.arange(len(all_volumes))
+    cols = np.repeat(0, len(all_volumes))
+    data = b_s_grav
+    b_s_grav = csc_matrix((data,(lines,cols)),shape=(len(all_volumes),1))
+    b = b_s_grav
+
 ########################## apagar para usar pressão-vazão
 # ID_globaln=mb.tag_get_data(ID_reordenado_tag,volumes_n, flat=True)
 # T[ID_globaln]=scipy.sparse.csc_matrix((len(ID_globaln),T.shape[0]))
@@ -1195,13 +1243,14 @@ for v in all_volumes:
 p_tag = pms_adm_nv1_tag
 gids_nv0 = mb.tag_get_data(dict_tags['ID_reord_tag'], all_volumes, flat=True)
 map_global = dict(zip(all_volumes, gids_nv0))
-TT, bb = oth.fine_transmissibility_structured(mb, mtu, map_global, faces_in=rng.subtract(all_faces, boundary_faces))
+# TT, bb = oth.fine_transmissibility_structured(mb, mtu, map_global, faces_in=rng.subtract(all_faces, boundary_faces))
 # name_tag_faces_boundary_meshsets
 coarse_flux_nv2_tag = mb.tag_get_handle('Q_nv2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-oth1 = oth(mb, mtu)
+# oth1 = oth(mb, mtu)
 tag_faces_bound_nv2 = mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(2))
 all_faces_boundary_nv2 = mb.tag_get_data(tag_faces_bound_nv2, 0, flat=True)[0]
 all_faces_boundary_nv2 = mb.get_entities_by_handle(all_faces_boundary_nv2)
+
 for m in meshsets_nv1:
     qtot = 0.0
     elems = mb.get_entities_by_handle(m)

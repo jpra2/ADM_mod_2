@@ -14,6 +14,8 @@ from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
 from processor import def_intermediarios as def1
+# from processor import bifasico_sol_direta as bifasico2
+# import pdb; pdb.set_trace()
 
 # import solucao_adm_bifasico.solucao_adm_bifasico as sol_adm_bif
 
@@ -52,9 +54,8 @@ tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 ##alterar
 
 def1.def_inter(mb, tags_1)
-def1.injector_producer(mb)
+def1.injector_producer_press(mb)
 def1.cent(mb, mtu, all_volumes)
-
 #######################################
 
 os.chdir(flying_dir)
@@ -508,11 +509,15 @@ if ADM:
 
 elif ADM == False:
     os.chdir(bifasico_sol_direta_dir)
-    loader = importlib.machinery.SourceFileLoader('bifasico_sol_direta', parent_dir + '/bifasico_sol_direta.py')
-    bifasico = loader.load_module('bifasico_sol_direta').sol_direta_bif(mb, mtu, all_volumes)
+    # import importlib
+    # loader = importlib.machinery.SourceFileLoader('bifasico_sol_direta', parent_dir + '/bifasico_sol_direta.py')
+    # bifasico = loader.load_module('bifasico_sol_direta').sol_direta_bif(mb, mtu, all_volumes, data_loaded)
+    from processor.bifasico_sol_direta import sol_direta_bif as bifasico
+    bifasico = bifasico(mb, mtu, all_volumes, data_loaded)
     bifasico.gravity = bif_utils.gravity
     bifasico.mi_w = bif_utils.mi_w #Paxs
     bifasico.mi_o = bif_utils.mi_o
+    contador = 0
 
     while verif:
 
@@ -524,6 +529,10 @@ elif ADM == False:
         bifasico.verificar_cfl(all_volumes, loop)
         print('loop: ', loop)
         print('delta_t: ', bifasico.delta_t, '\n')
+
+        if contador > 29:
+            import pdb; pdb.set_trace()
+            contador = 0
 
 
         t += bifasico.delta_t
