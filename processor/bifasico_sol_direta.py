@@ -25,6 +25,7 @@ import importlib.machinery
 class sol_direta_bif:
 
     def __init__(self, mb, mtu, all_volumes, data_loaded):
+        self.k_pe_m = conv.pe_to_m(1.0)
         self.k2 = 0.9
         self.cfl_ini = self.k2
         self.cfl = self.k2
@@ -90,12 +91,12 @@ class sol_direta_bif:
         phis = phis[bb]
         v0 = all_volumes[0]
         points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
-        coords = self.mb.get_coords(points).reshape(len(points), 3)
+        coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
         maxs = coords.max(axis=0)
         mins = coords.min(axis=0)
         hs = maxs - mins
         self.hs = hs
-        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
 
         # hs[0] = conv.pe_to_m(hs[0])
         # hs[1] = conv.pe_to_m(hs[1])
@@ -315,6 +316,21 @@ class sol_direta_bif:
                 print('loop')
                 print(loop)
                 print('\n')
+                vi = volumes[i]
+                adjsi = self.mtu.get_bridge_adjacencies(vi, 2, 3)
+                facesi = self.mtu.get_bridge_adjacencies(vi, 3, 2)
+                faces_adjs = self.mtu.get_bridge_adjacencies(adjsi, 3, 2)
+                facesinter = rng.intersect(facesi, faces_adjs)
+                pi = self.mb.tag_get_data(self.pf_tag, vi, flat=True)
+                padjs = self.mb.tag_get_data(self.pf_tag, adjsi, flat=True)
+                keqs = self.mb.tag_get_data(self.mobi_in_faces_tag, facesinter, flat=True)
+                idsadjs = [self.map_volumes[v] for v in adjsi]
+                lladj = np.array([np.array(self.mb.get_adjacencies(f, 3)) for f in facesinter])
+                ll0 = lladj[:,0]
+                ll1 = lladj[:,1]
+                ps0 = self.mb.tag_get_data(self.pf_tag, np.array(ll0), flat=True)
+                ps1 = self.mb.tag_get_data(self.pf_tag, np.array(ll1), flat=True)
+
                 import pdb; pdb.set_trace()
                 return 1
 

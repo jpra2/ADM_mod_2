@@ -9,5 +9,4 @@ input_dir = os.path.join(parent_parent_dir, 'input')
 flying_dir = os.path.join(parent_parent_dir, 'flying')
 
 os.chdir(parent_dir)
-
 os.system('rm *.npy')

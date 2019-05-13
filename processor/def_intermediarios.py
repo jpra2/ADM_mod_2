@@ -8,6 +8,9 @@ parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
 flying_dir = os.path.join(parent_parent_dir, 'flying')
 
+k_pe_to_m = conv.pe_to_m(1.0)
+k_md_to_m2 = conv.milidarcy_to_m2(1.0)
+k_psi_to_pa = conv.psi_to_Pa(1.0)
 
 def def_inter(mb, dict_tags):
     intermediarios_tag = mb.tag_get_handle('intermediarios', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
@@ -62,9 +65,10 @@ def cent(mb, mtu, all_volumes):
 def create_names_tags():
     os.chdir(flying_dir)
     names = ['d1', 'd2', 'l1_ID', 'l2_ID', 'l3_ID', 'P', 'Q', 'FACES_BOUNDARY', 'FACES_BOUNDARY_MESHSETS_LEVEL_2', 'FACES_BOUNDARY_MESHSETS_LEVEL_3',
-             'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC', 'PRIMAL_ID_1', 'PRIMAL_ID_2', 'L2_MESHSET', 'ID_reord_tag']
+             'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC', 'PRIMAL_ID_1', 'PRIMAL_ID_2', 'L2_MESHSET', 'ID_reord_tag', 'CENT', 'AREA',
+             'AREA2', 'PERM', 'K_EQ']
 
-    names2 = ['CENT', 'WELLS_PRODUCER', 'WELLS_INJECTOR']
+    names2 = ['WELLS_PRODUCER', 'WELLS_INJECTOR']
     nn = np.array(names)
     np.save('list_names_tags', nn)
 
@@ -72,7 +76,8 @@ def set_p_with_gravity(mb, mtu, volumes_d, press_tag, all_nodes, gama):
     # k0 = 500
     # k1 = 1e4
     # k2 = 4e3
-    values = mb.tag_get_data(press_tag, volumes_d, flat=True)
+
+    values = (k_pe_to_m)*mb.tag_get_data(press_tag, volumes_d, flat=True)
     # for i, v in enumerate(values):
     #     if v > k0:
     #         values[i] = k1
@@ -81,7 +86,7 @@ def set_p_with_gravity(mb, mtu, volumes_d, press_tag, all_nodes, gama):
     # k = 1.0
     # k = conv.psi_to_Pa(k)
     # values *= k
-    coords = mb.get_coords(all_nodes)
+    coords = (k_pe_to_m)*mb.get_coords(all_nodes)
     coords = coords.reshape([len(all_nodes), 3])
     maxs = coords.max(axis=0)
     Lz = maxs[2]
@@ -113,3 +118,27 @@ def converter_keq(mb, k_eq_tag, faces_in):
     keqs = mb.tag_get_data(k_eq_tag, faces_in, flat=True)
     keqs *= kk*kk2
     mb.tag_set_data(k_eq_tag, faces_in, keqs)
+
+def convert_to_SI(info):
+
+    mb = info['mb']
+    all_faces = info['all_faces']
+    all_volumes = info['all_volumes']
+    volumes_d = info['volumes_d']
+    cent_tag = info['cent_tag']
+    press_tag = info['press_tag']
+    area_tag = info['area_tag']
+    perm_tag = info['perm_tag']
+    k_eq_tag = info['k_eq_tag']
+
+    areas = (k_pe_to_m**2)*mb.tag_get_data(area_tag, all_faces, flat=True)
+    mb.tag_set_data(area_tag, all_faces, areas)
+
+    press_values = (k_psi_to_pa)*mb.tag_get_data(press_tag, volumes_d, flat=True)
+    mb.tag_set_data(press_tag, volumes_d, press_values)
+
+    centroids = (k_pe_to_m)*mb.tag_get_data(cent_tag, all_volumes)
+    mb.tag_set_data(cent_tag, all_volumes, centroids)
+
+    # keqs = (k_pe_to_m**2)*(k_md_to_m2)*mb.tag_get_data(k_eq_tag, all_faces, flat=True)
+    # mb.tag_set_data(k_eq_tag, all_faces, keqs)

@@ -20,7 +20,13 @@ flying_dir = os.path.join(parent_parent_dir, 'flying')
 os.chdir(parent_dir)
 
 class MeshManager:
+
     def __init__(self,mesh_file, dim=3):
+        # self.k_pe_m = conv.pe_to_m(1.0)
+        # self.k_md_to_m2 = conv.milidarcy_to_m2(1.0)
+        self.k_pe_m = 1.0
+        self.k_md_to_m2 = 1.0
+
         self.dimension = dim
         self.mb = core.Core()
         self.root_set = self.mb.get_root_set()
@@ -74,7 +80,7 @@ class MeshManager:
         for f in self.all_faces:
             self.set_area(f)'''
         print("took",time.time()-t0)
-        self.get_faces_boundary
+        self.get_faces_boundary()
 
 
     def create_tags(self):
@@ -86,11 +92,12 @@ class MeshManager:
         self.vazao_value_tag = self.mb.tag_get_handle("Q", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.all_faces_boundary_tag = self.mb.tag_get_handle("FACES_BOUNDARY", 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
         self.area_tag = self.mb.tag_get_handle("AREA", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.area2_tag = self.mb.tag_get_handle("AREA2", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.GLOBAL_ID_tag = self.mb.tag_get_handle("G_ID_tag", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
         self.ID_reordenado_tag = self.mb.tag_get_handle("ID_reord_tag", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
         self.phi_tag = self.mb.tag_get_handle("PHI", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.k_eq_tag = self.mb.tag_get_handle("K_EQ", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
+        self.cent_tag = self.mb.tag_get_handle('CENT', 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)
@@ -144,6 +151,7 @@ class MeshManager:
             #print(self.mb.tag_get_data(v_tags[1],v,flat=True))
 
     def set_area(self, face):
+        k2 = self.k_pe_m
         points = self.mtu.get_bridge_adjacencies(face, 2, 0)
         points = [self.mb.get_coords([vert]) for vert in points]
         if len(points) == 3:
@@ -153,12 +161,15 @@ class MeshManager:
 
         #calculo da area para quadrilatero regular
         elif len(points) == 4:
-            n = np.array([np.array(points[0] - points[1]), np.array(points[0] - points[2]), np.array(points[0] - points[3])])
+            n = k2*np.array([np.array(points[0] - points[1]), np.array(points[0] - points[2]), np.array(points[0] - points[3])])
             norms = np.array(list(map(np.linalg.norm, n)))
             ind_norm_max = np.where(norms == max(norms))[0]
             n = np.delete(n, ind_norm_max, axis = 0)
             area = np.cross(n[0], n[1])
+            area2 = np.linalg.norm(area)
         self.mb.tag_set_data(self.area_tag, face, area)
+        self.mb.tag_set_data(self.area2_tag, face, area2)
+        return area2
 
     def calc_area(self, face):
         points = self.mtu.get_bridge_adjacencies(face, 2, 0)
@@ -189,11 +200,10 @@ class MeshManager:
             elems: elementos vizinhos pela face
             s: termo fonte da gravidade
         """
-        k2 = conv.pe_to_m(1.0)
+        k2 = self.k_pe_m
         ADJs=np.array([self.mb.get_adjacencies(face, 3) for face in self.all_faces])
 
-        centroids=np.array([self.mtu.get_average_position([v]) for v in self.all_volumes])
-
+        centroids = self.mb.tag_get_data(self.cent_tag, self.all_volumes)
         ADJsv=np.array([self.mb.get_adjacencies(face, 0) for face in self.all_faces])
 
         ks=self.mb.tag_get_data(self.perm_tag, self.all_volumes)
@@ -201,9 +211,10 @@ class MeshManager:
         vol_to_pos=dict(zip(self.all_volumes,range(len(self.all_volumes))))
         cont=0
         K_eq=[]
-        for f in self.all_faces:
+        for i, f in enumerate(self.all_faces):
             adjs=ADJs[cont]
             adjsv=ADJsv[cont]
+            area = self.set_area(f)
             cont+=1
             if len(adjs)==2:
                 v1=adjs[0]
@@ -219,17 +230,19 @@ class MeshManager:
                 k2 = np.dot(np.dot(k2,uni), uni)
                 k_harm = (2*k1*k2)/(k1+k2)
 
-                vertex_cent=np.array([self.mb.get_coords([np.uint64(a)]) for a in adjsv])
-                dx=max(vertex_cent[:,0])-min(vertex_cent[:,0])
-                dy=max(vertex_cent[:,1])-min(vertex_cent[:,1])
-                dz=max(vertex_cent[:,2])-min(vertex_cent[:,2])
-                if dx<0.001:
-                    dx=1
-                if dy<0.001:
-                    dy=1
-                if dz<0.001:
-                    dz=1
-                area=dx*dy*dz
+                # vertex_cent=np.array([self.mb.get_coords([np.uint64(a)]) for a in adjsv])
+                # dx=max(vertex_cent[:,0])-min(vertex_cent[:,0])
+                # dy=max(vertex_cent[:,1])-min(vertex_cent[:,1])
+                # dz=max(vertex_cent[:,2])-min(vertex_cent[:,2])
+                # if dx<0.0001:
+                #     dx=1
+                # if dy<0.0001:
+                #     dy=1
+                # if dz<0.0001:
+                #     dz=1
+                # area=dx*dy*dz*(k2**2)
+                # area=areas[i]
+                # areas[i] = area
                 #area = self.mb.tag_get_data(self.area_tag, face, flat=True)[0]
                 #s_gr = self.gama*keq*(centroid2[2]-centroid1[2])
                 keq = k_harm*area/(self.mi*norm)
@@ -238,12 +251,12 @@ class MeshManager:
             else:
                 K_eq.append(0.0)
         self.mb.tag_set_data(self.k_eq_tag, self.all_faces, K_eq)
+        # self.mb.tag_set_data(self.area2_tag, self.all_faces, areas)
 
     def set_k_and_phi_structured_spe10(self):
         ks = np.load('spe10_perms_and_phi.npz')['perms']
         phi = np.load('spe10_perms_and_phi.npz')['phi']
-        k2 = 1.0
-        k2 = conv.milidarcy_to_m2(k2)
+        k2 = self.k_md_to_m2
         ks *= k2
 
         nx = 60
@@ -252,8 +265,10 @@ class MeshManager:
         perms = []
         phis = []
 
-        k = 1.0  #para converter a unidade de permeabilidade
-        centroids=np.array([self.mtu.get_average_position([v]) for v in self.all_volumes])
+        k = self.k_pe_m
+        centroids=k*np.array([self.mtu.get_average_position([v]) for v in self.all_volumes])
+        self.mb.tag_set_data(self.cent_tag, self.all_volumes, centroids)
+        self.all_centroids = centroids
         cont=0
         for v in self.all_volumes:
             centroid = centroids[cont]
@@ -262,7 +277,7 @@ class MeshManager:
             e = int(ijk[0] + ijk[1]*nx + ijk[2]*nx*ny)
             # perm = ks[e]*k
             # fi = phi[e]
-            perms.append(ks[e]*k)
+            perms.append(ks[e])
             phis.append(phi[e])
 
         self.mb.tag_set_data(self.perm_tag, self.all_volumes, perms)
@@ -374,11 +389,13 @@ def get_box(conjunto, all_centroids, limites, return_inds):
 # M1= MeshManager('27x27x27.msh')          # Objeto que armazenará as informações da malha
 M1= MeshManager('30x30x45.msh')          # Objeto que armazenará as informações da malha
 all_volumes=M1.all_volumes
-
+k_pe_m = M1.k_pe_m
+# k_pe_m = conv.pe_to_m(k_pe_m)
 # Ci = n: Ci -> Razão de engrossamento ni nível i (em relação ao nível i-1),
 # n -> número de blocos em cada uma das 3 direções (mesmo número em todas)
 
-M1.all_centroids=np.array([M1.mtu.get_average_position([v]) for v in all_volumes])
+# M1.all_centroids=np.array([M1.mtu.get_average_position([v]) for v in all_volumes])
+# M1.all_centroids=M1.mb.tag_get_data(M1.cent_tag, M1.all_volumes)
 all_centroids = M1.all_centroids
 
 nx=30
@@ -388,14 +405,20 @@ nz=45
 lx=20
 ly=10
 lz=2
+lx *= k_pe_m
+ly *= k_pe_m
+lz *= k_pe_m
+
 
 x1=nx*lx
 y1=ny*ly
 z1=nz*lz
 # Distância, em relação ao poço, até onde se usa malha fina
 r0 = 4
+r0 *= k_pe_m
 # Distância, em relação ao poço, até onde se usa malha intermediária
 r1 = 1
+r1 *= k_pe_m
 
 bvd = np.array([np.array([x1-lx, 0.0, 0.0]), np.array([x1, y1, lz])])
 bvn = np.array([np.array([0.0, 0.0, z1-lz]), np.array([lx, y1, z1])])
@@ -437,8 +460,6 @@ l1=[3*lx,3*ly,3*lz]
 l2=[9*lx,9*ly,9*lz]
 # Posição aproximada de cada completação
 
-
-
 #--------------fim dos parâmetros de entrada------------------------------------
 print("")
 print("INICIOU PRÉ PROCESSAMENTO")
@@ -446,7 +467,7 @@ print("INICIOU PRÉ PROCESSAMENTO")
 tempo0_pre=time.time()
 def Min_Max(e):
     verts = M1.mb.get_connectivity(e)
-    coords = np.array([M1.mb.get_coords([vert]) for vert in verts])
+    coords = k_pe_m*np.array([M1.mb.get_coords([vert]) for vert in verts])
     xmin, xmax = coords[0][0], coords[0][0]
     ymin, ymax = coords[0][1], coords[0][1]
     zmin, zmax = coords[0][2], coords[0][2]
@@ -637,7 +658,7 @@ def lu_inv4(M,lines):
 all_volumes=M1.all_volumes
 print("Volumes:",all_volumes)
 verts = M1.mb.get_connectivity(all_volumes[0])     #Vértices de um elemento da malha fina
-coords = np.array([M1.mb.get_coords([vert]) for vert in verts])
+coords = k_pe_m*np.array([M1.mb.get_coords([vert]) for vert in verts])
 xmin, xmax = coords[0][0], coords[0][0]
 ymin, ymax = coords[0][1], coords[0][1]
 zmin, zmax = coords[0][2], coords[0][2]
@@ -671,15 +692,17 @@ print("definiu poços")
 #-------------------------------------------------------------------------------
 #Determinação das dimensões do reservatório e dos volumes das malhas intermediária e grossa
 for v in M1.all_nodes:       # M1.all_nodes -> todos os vértices da malha fina
-    c=M1.mb.get_coords([v])  # Coordenadas de um nó
+    c=k_pe_m*M1.mb.get_coords([v])  # Coordenadas de um nó
     if c[0]>xmax: xmax=c[0]
     if c[0]<xmin: xmin=c[0]
     if c[1]>ymax: ymax=c[1]
     if c[1]<ymin: ymin=c[1]
     if c[2]>zmax: zmax=c[2]
     if c[2]<zmin: zmin=c[2]
-
 Lx, Ly, Lz = xmax-xmin, ymax-ymin, zmax-zmin  # Dimensões do reservatório
+# Lx *= k_pe_m
+# Ly *= k_pe_m
+# Lz *= k_pe_m
 #-------------------------------------------------------------------------------
 
 # Criação do vetor que define a "grade" que separa os volumes da malha grossa
@@ -695,13 +718,14 @@ lz2.append(Lz)
 #-------------------------------------------------------------------------------
 press = 4000.0
 vazao = 10000.0
-press = conv.psi_to_Pa(press)
-vazao = conv.psi_to_Pa(vazao)
+# press = conv.psi_to_Pa(press)
+# vazao = conv.psi_to_Pa(vazao)
 dirichlet_meshset = M1.mb.create_meshset()
 neumann_meshset = M1.mb.create_meshset()
 
 M1.gravity = False
-Lz2 = conv.pe_to_m(Lz)
+# Lz2 = conv.pe_to_m(Lz)
+Lz2 = Lz
 
 if M1.gravity == False:
     pressao = np.repeat(press, len(volumes_d))
@@ -710,8 +734,8 @@ if M1.gravity == False:
 # # colocar gravidade
 elif M1.gravity == True:
     pressao = []
-    z_elems_d = -1*np.array([M1.mtu.get_average_position([v])[2] for v in volumes_d])
-    z_elems_n = -1*np.array([M1.mtu.get_average_position([v])[2] for v in volumes_n])
+    z_elems_d = -1*(k_pe_m)*np.array([M1.mtu.get_average_position([v])[2] for v in volumes_d])
+    z_elems_n = -1*(k_pe_m)*np.array([M1.mtu.get_average_position([v])[2] for v in volumes_n])
     delta_z = z_elems_d + Lz2
     pressao = M1.gama*(delta_z) + press
     delta_z = z_elems_n + Lz2
@@ -740,6 +764,9 @@ M1.mb.tag_set_data(M1.press_value_tag, volumes_d, pressao)
 # M1.mb.tag_set_data(M1.press_value_tag, volumes_n, np.repeat(vazao, len(volumes_n)))
 M1.mb.tag_set_data(M1.press_value_tag, volumes_n, vazao)
 
+####################################################
+#inicio geracao da malha dual
+tini1_dual = time.time()
 #-------------------------------------------------------------------------------
 # Vetor que define a "grade" que separa os volumes da malha fina
 # Essa grade é relativa a cada um dos blocos da malha grossa
@@ -768,7 +795,6 @@ for i in range(int(Ly/l1[1])-2-nD_y):
 lyd1.append(ymin+Ly-dy0/100)
 
 lzd1=[zmin+dz0/100]
-
 for i in range(int(Lz/l1[2])-2-nD_z):
     lzd1.append(l1[2]/2+(i+1)*l1[2])
 lzd1.append(xmin+Lz-dz0/100)
@@ -795,7 +821,6 @@ for i in range(1,int(len(lzd1)*l1[2]/l2[2])-1):
 lzd2.append(lzd1[-1])
 
 print("definiu planos do nível 2")
-
 
 node=M1.all_nodes[0]
 coords=M1.mb.get_coords([node])
@@ -833,6 +858,8 @@ t0=time.time()
 # Esse bloco é executado apenas uma vez em um problema bifásico, sua eficiência
 # não é criticamente importante.
 L2_meshset=M1.mb.create_meshset()       # root Meshset
+l2m_tag = M1.mb.tag_get_handle('L2_MESHSET', 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
+M1.mb.tag_set_data(l2m_tag, 0, L2_meshset)
 
 ###########################################################################################
 #jp:modifiquei as tags abaixo para sparse
@@ -853,7 +880,7 @@ D_x=max(Lx-int(Lx/l1[0])*l1[0],Lx-int(Lx/l2[0])*l2[0])
 D_y=max(Ly-int(Ly/l1[1])*l1[1],Ly-int(Ly/l2[1])*l2[1])
 D_z=max(Lz-int(Lz/l1[2])*l1[2],Lz-int(Lz/l2[2])*l2[2])
 
-centroids=np.array([M1.mtu.get_average_position([np.uint64(v)]) for v in M1.all_volumes])
+centroids=all_centroids
 sx=0
 ref_dual=False
 M1.mb.add_entities(AV_meshset,all_volumes)
@@ -987,9 +1014,14 @@ for i in range(len(lx2)-1):
                         nc1+=1
                         M1.mb.add_child_meshset(l2_meshset,l1_meshset)
 #-------------------------------------------------------------------------------
-
+tend1_dual = time.time()
 print('Criação da árvore de meshsets primais: ',time.time()-t0)
+# terminou a malha dual
+##########################################################################
 
+####################################
+# colocando as faces de contorno
+tini2 = time.time()
 ta=time.time()
 all_volumes=M1.all_volumes
 vert_meshset=M1.mb.create_meshset()
@@ -1003,14 +1035,13 @@ vert_meshset=M1.mb.create_meshset()
 # flying_dir = os.path.join(parent_parent_dir, 'flying')
 # utils_dir = os.path.join(parent_parent_dir, 'utils')
 
-import importlib.machinery
+# import importlib.machinery
 # loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
 # utpy = loader.load_module('pymoab_utils')
 from utils import pymoab_utils as utpy
 
 meshsets_nv1 = M1.mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
 meshsets_nv2 = M1.mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([None]))
-
 
 n_levels = 2
 name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
@@ -1022,15 +1053,18 @@ for i in range(n_levels):
     # names_tags_criadas_aqui.append(name_tag_faces_boundary_meshsets + str(i+2))
     tag_boundary = M1.mb.tag_get_handle(name_tag_faces_boundary_meshsets + str(i+2), 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
     utpy.set_faces_in_boundary_by_meshsets(M1.mb, M1.mtu, meshsets, tag_boundary)
-t1 = time.time()
+tend2 = time.time()
 print('tempo faces contorno')
-print(t1-t0)
+# fim faces de contorno
 ###################################################################################################
 
 #for e in all_volumes:
 #    d1_tag = int(M1.mb.tag_get_data(D1_tag, e, flat=True))
 #    if d1_tag==3:
 #        M1.mb.add_entities(vert_meshset,[e])
+
+## tempo inicial da malha adm
+tini3 = time.time()
 all_vertex_d1=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([3]))
 all_vertex_d1=np.uint64(np.array(rng.unite(all_vertex_d1,M1.mb.get_entities_by_type_and_tag(0, types.MBTET, np.array([D1_tag]), np.array([3])))))
 mm=0
@@ -1072,6 +1106,7 @@ t0=time.time()'''
 # sua eficiência é criticamente importante.
 
 ##########################################################################################
+
 vertices=M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([D1_tag]), np.array([3]))
 vertices=rng.unite(vertices,M1.mb.get_entities_by_type_and_tag(0, types.MBTET, np.array([D1_tag]), np.array([3])))
 all_vertex_centroids=np.array([M1.mtu.get_average_position([v]) for v in vertices])
@@ -1096,12 +1131,12 @@ L3_ID_tag=M1.mb.tag_get_handle("l3_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_S
 # ni = ID do elemento no nível i
 
 # volumes da malha grossa primal 1
-meshsets_nv1 = M1.mb.get_entities_by_type_and_tag(
-        M1.root_set, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
-
-# volumes da malha grossa primal 2
-meshsets_nv2 = M1.mb.get_entities_by_type_and_tag(
-        M1.root_set, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([None]))
+# meshsets_nv1 = M1.mb.get_entities_by_type_and_tag(
+#         M1.root_set, types.MBENTITYSET, np.array([primal_id_tag1]), np.array([None]))
+#
+# # volumes da malha grossa primal 2
+# meshsets_nv2 = M1.mb.get_entities_by_type_and_tag(
+#         M1.root_set, types.MBENTITYSET, np.array([primal_id_tag2]), np.array([None]))
 
 
 for meshset in meshsets_nv2:
@@ -1958,10 +1993,7 @@ cols=np.concatenate([cols,Gid_2])
 data=np.concatenate([data,-ks])
 #T[Gid_2][Gid_2]-=1
 
-
-
 T=csc_matrix((data,(lines,cols)),shape=(len(M1.all_volumes),len(M1.all_volumes)))
-# Tfina = T.copy()
 Aii=csc_matrix((dii,(lii,cii)),shape=(ni,ni))
 Aif=csc_matrix((dif,(lif,cif)),shape=(ni,nf))
 Aff=csc_matrix((dff,(lff,cff)),shape=(nf,nf))
@@ -1974,54 +2006,59 @@ print("def as",time.time()-tempo0_ADM)
 Ivv=scipy.sparse.identity(nv)
 ty=time.time()
 
-'''
+
 #############
-# obter termo fonte de gravidade
-definter.cent(M1.mb, M1.mtu, all_volumes)
-cent_tag = M1.mb.tag_get_handle('CENT')
-boundary_faces = M1.all_boundary_faces
-faces_in = rng.subtract(M1.all_faces, boundary_faces)
-ids_volumes_tag = M1.mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
-M1.mb.tag_set_data(ids_volumes_tag, all_volumes, np.arange(len(all_volumes)))
-gamaf_tag = M1.mb.tag_get_handle('GAMAF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-M1.mb.tag_set_data(gamaf_tag, M1.all_faces, np.repeat(float(M1.gama), len(M1.all_faces)))
-sgravf_tag = M1.mb.tag_get_handle('SGRAVF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-Adjs = np.array([np.array(M1.mb.get_adjacencies(f, 3)) for f in faces_in])
-all_centroids = M1.mb.tag_get_data(cent_tag, all_volumes)
-ids_0 = np.array([M1.mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
-ids_1 = np.array([M1.mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
-s_gravsf = definter.set_s_grav_faces(M1.mb, M1.k_eq_tag, all_volumes, all_centroids, faces_in, gamaf_tag, sgravf_tag, ids_0, ids_1)
-idsrr0 = M1.mb.tag_get_data(M1.ID_reordenado_tag, np.array(Adjs[:,0]), flat=True)
-idsrr1 = M1.mb.tag_get_data(M1.ID_reordenado_tag, np.array(Adjs[:,1]), flat=True)
-ids_reord_elems0 = idsrr0
-ids_reord_elems1 = idsrr1
-# ids_reord_elems0 = np.array([M1.mb.tag_get_data(M1.ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
-# ids_reord_elems1 = np.array([M1.mb.tag_get_data(M1.ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
-fonte_grav = np.zeros(len(all_volumes))
-fonte_grav[ids_reord_elems0] -= s_gravsf
-fonte_grav[ids_reord_elems1] += s_gravsf
-b2 = fonte_grav.copy()
+if M1.gravity:
+    # obter termo fonte de gravidade
+    Tfina = T.copy()
+    definter.cent(M1.mb, M1.mtu, all_volumes)
+    cent_tag = M1.mb.tag_get_handle('CENT')
+    boundary_faces = M1.all_boundary_faces
+    faces_in = rng.subtract(M1.all_faces, boundary_faces)
+    ids_volumes_tag = M1.mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+    M1.mb.tag_set_data(ids_volumes_tag, all_volumes, np.arange(len(all_volumes)))
+    gamaf_tag = M1.mb.tag_get_handle('GAMAF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    M1.mb.tag_set_data(gamaf_tag, M1.all_faces, np.repeat(float(M1.gama), len(M1.all_faces)))
+    sgravf_tag = M1.mb.tag_get_handle('SGRAVF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    Adjs = np.array([np.array(M1.mb.get_adjacencies(f, 3)) for f in faces_in])
+    all_centroids = M1.mb.tag_get_data(cent_tag, all_volumes)
+    ids_0 = np.array([M1.mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
+    ids_1 = np.array([M1.mb.tag_get_data(ids_volumes_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
+    s_gravsf = definter.set_s_grav_faces(M1.mb, M1.k_eq_tag, all_volumes, all_centroids, faces_in, gamaf_tag, sgravf_tag, ids_0, ids_1)
+    idsrr0 = M1.mb.tag_get_data(M1.ID_reordenado_tag, np.array(Adjs[:,0]), flat=True)
+    idsrr1 = M1.mb.tag_get_data(M1.ID_reordenado_tag, np.array(Adjs[:,1]), flat=True)
+    ids_reord_elems0 = idsrr0
+    ids_reord_elems1 = idsrr1
+    # ids_reord_elems0 = np.array([M1.mb.tag_get_data(M1.ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,0]])
+    # ids_reord_elems1 = np.array([M1.mb.tag_get_data(M1.ID_reordenado_tag, int(elem), flat=True)[0] for elem in Adjs[:,1]])
+    fonte_grav = np.zeros(len(all_volumes))
+    fonte_grav[ids_reord_elems0] -= s_gravsf
+    fonte_grav[ids_reord_elems1] += s_gravsf
+    b2 = fonte_grav.copy()
 
-ids_volumes_d = M1.mb.tag_get_data(M1.ID_reordenado_tag, volumes_d, flat=True)
-values_d = M1.mb.tag_get_data(M1.press_value_tag, volumes_d, flat=True)
-Tfina = Tfina.tolil()
-Tfina[ids_volumes_d] = sp.lil_matrix((len(ids_volumes_d), Tfina.shape[0]))
-Tfina[ids_volumes_d, ids_volumes_d] = np.ones(len(ids_volumes_d))
-b2[ids_volumes_d] = values_d
+    fonte_grav_tag = M1.mb.tag_get_handle('SGRAVV', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    M1.mb.tag_set_data(fonte_grav_tag, wirebasket_elems_0, fonte_grav)
 
-ids_volumes_n = M1.mb.tag_get_data(M1.ID_reordenado_tag, volumes_n, flat=True)
-# values_n = M1.mb.tag_get_data(M1.vazao_value_tag, volumes_n, flat=True)
-values_n = M1.mb.tag_get_data(M1.press_value_tag, volumes_n, flat=True)
-Tfina[ids_volumes_n] = sp.lil_matrix((len(ids_volumes_n), Tfina.shape[0]))
-Tfina[ids_volumes_n, ids_volumes_n] = np.ones(len(ids_volumes_n))
-b2[ids_volumes_n] = values_n
+    ids_volumes_d = M1.mb.tag_get_data(M1.ID_reordenado_tag, volumes_d, flat=True)
+    values_d = M1.mb.tag_get_data(M1.press_value_tag, volumes_d, flat=True)
+    Tfina = Tfina.tolil()
+    Tfina[ids_volumes_d] = sp.lil_matrix((len(ids_volumes_d), Tfina.shape[0]))
+    Tfina[ids_volumes_d, ids_volumes_d] = np.ones(len(ids_volumes_d))
+    b2[ids_volumes_d] = values_d
 
-pf2_tag = M1.mb.tag_get_handle('Pfino2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-pf2 = linalg.spsolve(Tfina.tocsc(), b2)
-M1.mb.tag_set_data(pf2_tag, wirebasket_elems_0, pf2)
+    ids_volumes_n = M1.mb.tag_get_data(M1.ID_reordenado_tag, volumes_n, flat=True)
+    # values_n = M1.mb.tag_get_data(M1.vazao_value_tag, volumes_n, flat=True)
+    values_n = M1.mb.tag_get_data(M1.press_value_tag, volumes_n, flat=True)
+    Tfina[ids_volumes_n] = sp.lil_matrix((len(ids_volumes_n), Tfina.shape[0]))
+    Tfina[ids_volumes_n, ids_volumes_n] = np.ones(len(ids_volumes_n))
+    b2[ids_volumes_n] = values_n
 
-# b = b2.copy()
-'''
+    pf2_tag = M1.mb.tag_get_handle('Pfino2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    pf2 = linalg.spsolve(Tfina.tocsc(), b2)
+    M1.mb.tag_set_data(pf2_tag, wirebasket_elems_0, pf2)
+
+    b = b2.copy()
+
 #th=time.time()
 #M2=-linalg.inv(Aee)*Aev
 #print(time.time()-th,"Direto")
@@ -2042,18 +2079,15 @@ del(M3)
 '''
 
 ta1=time.time()
-
 arestas_meshset=M1.mb.create_meshset()
 M1.mb.add_entities(arestas_meshset,arestas)
 faces_meshset=M1.mb.create_meshset()
 M1.mb.add_entities(faces_meshset,faces)
 internos_meshset=M1.mb.create_meshset()
 M1.mb.add_entities(internos_meshset,internos)
-
 nivel_0_arestas=M1.mb.get_entities_by_type_and_tag(arestas_meshset, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
 nivel_0_faces=M1.mb.get_entities_by_type_and_tag(faces_meshset, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
 nivel_0_internos=M1.mb.get_entities_by_type_and_tag(internos_meshset, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
-
 IDs_arestas_0=M1.mb.tag_get_data(M1.ID_reordenado_tag,nivel_0_arestas,flat=True)
 IDs_faces_0=M1.mb.tag_get_data(M1.ID_reordenado_tag,nivel_0_faces,flat=True)
 IDs_internos_0=M1.mb.tag_get_data(M1.ID_reordenado_tag,nivel_0_internos,flat=True)
@@ -2534,14 +2568,11 @@ for i in range(len(dat)):
         dat[i]=1
 '''
 OR_ADM_2=csc_matrix((dat,(lin,col)),shape=(n2,n1))
-
-
 ID_global=M1.mb.tag_get_data(M1.ID_reordenado_tag,volumes_d, flat=True)
 ID_ADM=int(M1.mb.tag_get_data(L1_ID_tag,v))
 ID_ADM_2=M1.mb.tag_get_data(L2_ID_tag,volumes_d, flat=True)
 T[ID_global]=scipy.sparse.csc_matrix((len(ID_global),T.shape[0]))
 T[ID_global,ID_global]=np.ones(len(ID_global))
-
 
 ########################## apagar para usar pressão-vazão
 ID_globaln=M1.mb.tag_get_data(M1.ID_reordenado_tag,volumes_n, flat=True)
@@ -2710,7 +2741,7 @@ for m in meshsets_nv1:
     qtot = 0.0
     elems = M1.mb.get_entities_by_handle(m)
     l3 = np.unique(M1.mb.tag_get_data(L3_ID_tag, elems, flat=True))
-    if l3[0] > 2:
+    if l3[0] > 2 or l3[0] < 2:
         continue
     faces = M1.mtu.get_bridge_adjacencies(elems, 3, 2)
     b_faces = rng.intersect(faces, all_faces_boundary_nv2)
@@ -2770,15 +2801,26 @@ M1.mb.add_entities(av,M1.all_volumes)
 
 M1.mb.write_file('teste_3D_unstructured_18_2.vtk',[av])
 os.chdir(flying_dir)
-M1.mb.write_file('30x30x45_malha_adm')
+M1.mb.write_file('30x30x45_malha_adm.h5m')
 np.save('faces_adjs_by_dual', faces_adjs_by_dual)
 np.save('intern_adjs_by_dual', intern_adjs_by_dual)
 print('New file created')
+erroabs = np.absolute(SOL_TPFA - SOL_ADM_fina)
+normaL2 = np.linalg.norm(erroabs)
+normaL2rel = 100*normaL2/np.linalg.norm(SOL_TPFA)
+print(f'normaL2: {normaL2}')
+print(f'normaL2rel: {normaL2rel}')
 print(min(erro),max(erro))
 print("razão norma L2",np.linalg.norm(erro)/np.linalg.norm(SOL_TPFA))
 print('norma L2:', np.linalg.norm(erro))
-
-
+n = len(M1.all_volumes)
+vols0 = M1.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([L3_ID_tag]), np.array([1]))
+n2 = len(vols0)
+n3 = len(np.unique(M1.mb.tag_get_data(L2_ID_tag, M1.all_volumes, flat=True)))
+perc_vols_ativos1 =100*(n2/n)
+perc_vols_ativos3 = 100*(n3/n)
+print(f'perc_vols_ativos1: {perc_vols_ativos1}')
+print(f'perc_vols_ativos3: {perc_vols_ativos3}')
 
 x0=SOL_ADM_fina
 ran=range(len(M1.all_volumes))

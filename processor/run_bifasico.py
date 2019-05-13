@@ -14,10 +14,6 @@ from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
 from processor import def_intermediarios as def1
-# from processor import bifasico_sol_direta as bifasico2
-# import pdb; pdb.set_trace()
-
-# import solucao_adm_bifasico.solucao_adm_bifasico as sol_adm_bif
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -31,6 +27,9 @@ output_dir = os.path.join(parent_parent_dir, 'output')
 out_bif_dir = os.path.join(output_dir, 'bifasico')
 out_bif_soldir_dir =  os.path.join(out_bif_dir, 'sol_direta')
 out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
+
+k_pe_m = conv.pe_to_m(1.0)
+k_md_to_m2 = conv.milidarcy_to_m2(1.0)
 
 # import importlib.machinery
 
@@ -55,7 +54,6 @@ tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 
 def1.def_inter(mb, tags_1)
 def1.injector_producer_press(mb)
-def1.cent(mb, mtu, all_volumes)
 #######################################
 
 os.chdir(flying_dir)
@@ -63,7 +61,6 @@ faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
 intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
-
 
 tags = [tags_1['l1_ID'], tags_1['l2_ID']]
 for tag in tags:
@@ -74,9 +71,9 @@ for tag in tags:
 vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
-# loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
-# bif_utils = loader.load_module('bif_utils').bifasico(mb, mtu, all_volumes)
+
 bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
+
 bif_utils.gravity = data_loaded['gravity']
 # loader = importlib.machinery.SourceFileLoader('sol_adm_bifasico', parent_dir + '/sol_adm_bifasico.py')
 # sol_adm_bif = loader.load_module('sol_adm_bifasico')
@@ -136,12 +133,12 @@ tags_1['S_GRAV'] = bif_utils.s_grav_tag
 def get_ls(all_volumes):
     v0 = all_volumes[0]
     points = mtu.get_bridge_adjacencies(v0, 3, 0)
-    coords = mb.get_coords(points).reshape([len(points), 3])
+    coords = (k_pe_m)*mb.get_coords(points).reshape([len(points), 3])
     maxs = coords.max(axis=0)
     mins = coords.min(axis=0)
     h0 = maxs - mins
     points = mtu.get_bridge_adjacencies(all_volumes, 3, 0)
-    coords = mb.get_coords(points).reshape([len(points), 3])
+    coords = (k_pe_m)*mb.get_coords(points).reshape([len(points), 3])
     maxs = coords.max(axis=0)
     mins = coords.min(axis=0)
     h = maxs - mins
@@ -180,6 +177,22 @@ def set_keq(all_volumes, faces_in, tags):
 
 
 # set_keq(all_volumes, faces_in, tags_1)
+info = dict()
+info['mb'] = mb
+info['all_faces'] = all_faces
+info['all_volumes'] = all_volumes
+info['volumes_d'] = sol_adm.volumes_d
+info['cent_tag'] = tags_1['CENT']
+info['press_tag'] = tags_1['P']
+info['area_tag'] = tags_1['AREA2']
+info['perm_tag'] = tags_1['PERM']
+info['k_eq_tag'] = tags_1['K_EQ']
+
+def1.convert_to_SI(info)
+del info
+
+bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
+
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
 k01 = 1e-3
@@ -520,6 +533,7 @@ elif ADM == False:
     contador = 0
 
     while verif:
+        contador += 1
 
         t0 = time.time()
         bifasico.solution_PF(sol_adm.wirebasket_elems, map_global, faces_in, tags_1)

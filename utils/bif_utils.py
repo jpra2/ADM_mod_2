@@ -38,6 +38,8 @@ import importlib.machinery
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
 
+        self.k_pe_m = conv.pe_to_m(1.0)
+
         self.cfl_ini = 0.9
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
@@ -111,7 +113,7 @@ class bifasico:
         self.fimin = phis.min()
         v0 = all_volumes[0]
         points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
-        coords = self.mb.get_coords(points).reshape(len(points), 3)
+        coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
         maxs = coords.max(axis=0)
         mins = coords.min(axis=0)
         hs = maxs - mins
@@ -122,7 +124,7 @@ class bifasico:
 
         self.hs = hs
         vol = hs[0]*hs[1]*hs[2]
-        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
         self.mb.tag_set_data(self.volume_tag, all_volumes, np.repeat(vol, len(all_volumes)))
         self.Vmin = vol
         historico = np.array(['vpi', 'tempo', 'prod_agua', 'prod_oleo', 'wor', 'dt'])
