@@ -30,6 +30,8 @@ out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
 
 k_pe_m = conv.pe_to_m(1.0)
 k_md_to_m2 = conv.milidarcy_to_m2(1.0)
+# k_pe_m = 1.0
+# k_md_to_m2 = 1.0
 
 # import importlib.machinery
 
@@ -48,6 +50,16 @@ mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprim
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 # tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
 tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+
+# k10 = [1.0, 0.0, 0.0,
+#        0.0, 1.0, 0.0,
+#        0.0, 0.0, 1.0]
+#
+# for v in all_volumes:
+#     mb.tag_set_data(tags_1['PERM'], v, np.array(k10))
+#
+# # mb.tag_set_data(tags_1['PERM'], all_volumes, np.repeat(k10, len(all_volumes)))
+# mb.tag_set_data(tags_1['K_EQ'], all_faces, np.repeat(1.0, len(all_faces)))
 
 ########################################
 ##alterar
@@ -174,8 +186,6 @@ def set_keq(all_volumes, faces_in, tags):
     mb.tag_set_data(tags['K_EQ'], faces_in, keqs)
 
 
-
-
 # set_keq(all_volumes, faces_in, tags_1)
 info = dict()
 info['mb'] = mb
@@ -192,7 +202,6 @@ def1.convert_to_SI(info)
 del info
 
 bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
-
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
 k01 = 1e-3
@@ -216,8 +225,6 @@ map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.
 
 finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
 # meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
-
-
 
 def run_PMS(n1_adm, n2_adm, loop):
 
@@ -326,8 +333,6 @@ def run_PMS(n1_adm, n2_adm, loop):
 def run_2(t):
     print('entrou run2')
     tini = time.time()
-    #### teste_pcorr
-    # bif_utils.get_flux_coarse_volumes(tags_1, all_volumes, bound_faces_nv, tags_1['PMS2'], [meshset_vertices, meshset_vertices_nv2])
 
     elems_nv0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
     # vertices_nv1 = rng.subtract(sol_adm.vertices, elems_nv0)
@@ -335,8 +340,6 @@ def run_2(t):
 
     k = 0
     cont = 0
-
-
 
     for vert in vertices_nv1:
         t00 = time.time()
@@ -407,10 +410,6 @@ def run_2_v2(t):
     mb.write_file('exemplo.vtk', [vv])
     import pdb; pdb.set_trace()
 
-
-
-
-
 def run_3(loop):
     print('entrou run3')
     t0 = time.time()
@@ -448,7 +447,6 @@ def run(t, loop):
     return t2, loop
 
 loops = 10
-
 t = 0
 loop = 0
 t2 = 0

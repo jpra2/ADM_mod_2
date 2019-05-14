@@ -73,27 +73,14 @@ def create_names_tags():
     np.save('list_names_tags', nn)
 
 def set_p_with_gravity(mb, mtu, volumes_d, press_tag, all_nodes, gama):
-    # k0 = 500
-    # k1 = 1e4
-    # k2 = 4e3
 
-    values = (k_pe_to_m)*mb.tag_get_data(press_tag, volumes_d, flat=True)
-    # for i, v in enumerate(values):
-    #     if v > k0:
-    #         values[i] = k1
-    #     else:
-    #         values[i] = k2
-    # k = 1.0
-    # k = conv.psi_to_Pa(k)
-    # values *= k
+    values = (k_psi_to_pa)*mb.tag_get_data(press_tag, volumes_d, flat=True)
     coords = (k_pe_to_m)*mb.get_coords(all_nodes)
     coords = coords.reshape([len(all_nodes), 3])
     maxs = coords.max(axis=0)
     Lz = maxs[2]
-    Lz = conv.pe_to_m(maxs[2])
-
     # z_elems_d = -1*np.array([mtu.get_average_position([v])[2] for v in volumes_d])
-    z_elems_d = -1*np.array([conv.pe_to_m(mtu.get_average_position([v])[2]) for v in volumes_d])
+    z_elems_d = -1*(k_pe_to_m)*np.array([mtu.get_average_position([v])[2] for v in volumes_d])
     delta_z = z_elems_d + Lz
     pressao = gama*(delta_z) + values
     mb.tag_set_data(press_tag, volumes_d, pressao)
@@ -142,3 +129,9 @@ def convert_to_SI(info):
 
     # keqs = (k_pe_to_m**2)*(k_md_to_m2)*mb.tag_get_data(k_eq_tag, all_faces, flat=True)
     # mb.tag_set_data(k_eq_tag, all_faces, keqs)
+
+    perms = mb.tag_get_data(perm_tag, all_volumes)
+
+    for i, v in enumerate(all_volumes):
+        perm = perms[i]
+        mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)

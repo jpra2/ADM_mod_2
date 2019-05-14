@@ -9,8 +9,6 @@ import time
 import conversao as conv
 from utils.others_utils import OtherUtils as oth
 
-
-
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
@@ -29,7 +27,7 @@ class sol_direta_bif:
         self.k2 = 0.9
         self.cfl_ini = self.k2
         self.cfl = self.k2
-        self.delta_t_min = 100000
+        self.delta_t_min = 1000000
         self.perm_tag = mb.tag_get_handle('PERM')
         # self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
         self.mi_w = float(data_loaded['dados_bifasico']['mi_w'])
@@ -83,6 +81,8 @@ class sol_direta_bif:
         self.gamaf_tag = mb.tag_get_handle('GAMAF')
         self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
         self.map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
+        self.ids_volumes_tag = mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+        mb.tag_set_data(self.ids_volumes_tag, all_volumes, np.arange(len(all_volumes)))
         self.mb = mb
         self.mtu = mtu
         self.gama = self.gama_w + self.gama_o
@@ -131,7 +131,6 @@ class sol_direta_bif:
         flux_in_faces = np.zeros(len(faces))
         fluxo_grav_volumes = np.zeros(len(volumes))
 
-
         for i, face in enumerate(faces):
             elems = self.mb.get_adjacencies(face, 3)
             mobi = mobi_in_faces[i]
@@ -159,9 +158,13 @@ class sol_direta_bif:
     def calculate_total_flux(self, volumes, faces):
 
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
-        all_gamaf = self.mb.tag_get_data(self.gamaf_tag, faces, flat=True)
+        # all_gamaf = self.mb.tag_get_data(self.gamaf_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
         ps = self.mb.tag_get_data(self.pf_tag, volumes, flat=True)
+        if self.gravity:
+            all_sgravs = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
+        else:
+            all_sgravs = np.zeros(len(faces))
 
         fluxos = np.zeros(len(volumes))
         fluxos_w = fluxos.copy()
@@ -169,13 +172,14 @@ class sol_direta_bif:
         fluxo_grav_volumes = np.zeros(len(volumes))
 
         for i, face in enumerate(faces):
-            gamaf = all_gamaf[i]
+            # gamaf = all_gamaf[i]
             elems = self.mb.get_adjacencies(face, 3)
             id0 = self.map_volumes[elems[0]]
             id1 = self.map_volumes[elems[1]]
             mobi = mobi_in_faces[i]
             # s_grav = self.gama*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
-            s_grav = gamaf*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            # s_grav = gamaf*mobi*(self.all_centroids[id1][2] - self.all_centroids[id0][2])
+            s_grav = all_sgravs[i]
             fw = fws_faces[i]
             flux = (ps[id1] - ps[id0])*mobi
             if self.gravity == True:
@@ -191,10 +195,56 @@ class sol_direta_bif:
             fluxos_w[id1] -= flux*fw
             flux_in_faces[i] = flux
 
+        import pdb; pdb.set_trace()
+
         self.mb.tag_set_data(self.total_flux_tag, volumes, fluxos)
         self.mb.tag_set_data(self.flux_w_tag, volumes, fluxos_w)
         self.mb.tag_set_data(self.flux_in_faces_tag, faces, flux_in_faces)
         self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
+
+
+    def calculate_total_flux_v2(self, volumes, faces):
+        mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
+        if self.gravity:
+            all_s_gravs = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
+        else:
+            all_s_gravs = np.zeros(len(faces))
+
+        flux_volumes = np.zeros(len(volumes))
+        flux_w_volumes = flux_volumes.copy()
+        s_grav_volumes = flux_volumes.copy()
+
+        flux_faces = np.zeros(len(faces))
+
+        Adjs = np.array([np.array(self.mb.get_adjacencies(f, 3)) for f in faces])
+        ps0 = self.mb.tag_get_data(self.pf_tag, np.array(Adjs[:, 0]), flat=True)
+        ps1 = self.mb.tag_get_data(self.pf_tag, np.array(Adjs[:, 1]), flat=True)
+        ids0 = self.mb.tag_get_data(self.ids_volumes_tag, np.array(Adjs[:,0]), flat=True)
+        ids1 = self.mb.tag_get_data(self.ids_volumes_tag, np.array(Adjs[:,1]), flat=True)
+
+        flux_in_faces = (ps1 - ps0)*mobi_in_faces + all_s_gravs
+        flux_w_in_faces = flux_in_faces*fws_faces
+        flux_volumes[ids0] += flux_in_faces
+        flux_volumes[ids1] -= flux_in_faces
+        flux_w_volumes[ids0] += flux_w_in_faces
+        flux_w_volumes[ids1] -= flux_w_in_faces
+        s_grav_volumes[ids0] += all_s_gravs
+        s_grav_volumes[ids1] -= all_s_gravs
+        fluxos = flux_volumes
+        fluxos_w = flux_w_volumes
+        fluxo_grav_volumes = s_grav_volumes
+
+        self.mb.tag_set_data(self.total_flux_tag, volumes, fluxos)
+        self.mb.tag_set_data(self.flux_w_tag, volumes, fluxos_w)
+        self.mb.tag_set_data(self.flux_in_faces_tag, faces, flux_in_faces)
+        self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
+
+        import pdb; pdb.set_trace()
+
+
+
+
 
     def calculate_sat_dep0(self, volumes, loop):
         """
@@ -316,6 +366,7 @@ class sol_direta_bif:
                 print('loop')
                 print(loop)
                 print('\n')
+                tag_test = self.mb.tag_get_handle('TAG_TEST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
                 vi = volumes[i]
                 adjsi = self.mtu.get_bridge_adjacencies(vi, 2, 3)
                 facesi = self.mtu.get_bridge_adjacencies(vi, 3, 2)
@@ -323,13 +374,21 @@ class sol_direta_bif:
                 facesinter = rng.intersect(facesi, faces_adjs)
                 pi = self.mb.tag_get_data(self.pf_tag, vi, flat=True)
                 padjs = self.mb.tag_get_data(self.pf_tag, adjsi, flat=True)
+                self.mb.tag_set_data(tag_test, adjsi, padjs)
+                self.mb.tag_set_data(tag_test, vi, pi)
                 keqs = self.mb.tag_get_data(self.mobi_in_faces_tag, facesinter, flat=True)
+                fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, facesinter, flat=True)
                 idsadjs = [self.map_volumes[v] for v in adjsi]
                 lladj = np.array([np.array(self.mb.get_adjacencies(f, 3)) for f in facesinter])
                 ll0 = lladj[:,0]
                 ll1 = lladj[:,1]
                 ps0 = self.mb.tag_get_data(self.pf_tag, np.array(ll0), flat=True)
                 ps1 = self.mb.tag_get_data(self.pf_tag, np.array(ll1), flat=True)
+
+                cc = self.mb.create_meshset()
+                self.mb.add_entities(cc, volumes)
+                self.mb.write_file('testt.vtk', [cc])
+
 
                 import pdb; pdb.set_trace()
                 return 1
@@ -468,7 +527,7 @@ class sol_direta_bif:
         """
         cfl usando fluxo em cada volume
         """
-        lim_sup = 1e5
+        lim_sup = 1e20
         self.cfl = self.cfl_ini
         self.all_faces_in = all_faces_in
         qs = self.mb.tag_get_data(self.flux_in_faces_tag, all_faces_in, flat=True)
@@ -518,8 +577,11 @@ class sol_direta_bif:
                     import pdb; pdb.set_trace()
 
             delta_ts[i] = min([dt1, dt2])
+
             if delta_ts[i] > self.delta_t_min:
-                delta_ts[i] = self.delta_t_min
+                pass
+                # delta_ts[i] = self.delta_t_min
+
 
 
         self.delta_t = delta_ts.min()
@@ -860,8 +922,9 @@ class sol_direta_bif:
         map_values = dict(zip(volumes_d, self.mb.tag_get_data(dict_tags['P'], volumes_d, flat=True)))
         Tf, b = oth.set_boundary_dirichlet_matrix(map_volumes, map_values, b, Tf)
         values_n = self.mb.tag_get_data(dict_tags['Q'], volumes_n, flat=True)
-        map_values = dict(zip(volumes_n, values_n))
-        b = oth.set_boundary_neumann(map_volumes, map_values, b)
+        if len(values_n) > 0:
+            map_values = dict(zip(volumes_n, values_n))
+            b = oth.set_boundary_neumann(map_volumes, map_values, b)
         x = oth.get_solution(Tf, b)
         self.mb.tag_set_data(self.pf_tag, all_volumes, x)
         # np.save('pf', x)

@@ -82,7 +82,6 @@ class MeshManager:
         print("took",time.time()-t0)
         self.get_faces_boundary()
 
-
     def create_tags(self):
         self.perm_tag = self.mb.tag_get_handle("PERM", 9, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.finos_tag = self.mb.tag_get_handle("finos", 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
@@ -145,10 +144,12 @@ class MeshManager:
         perm_tensor = [k, 0, 0,
                        0, k, 0,
                        0, 0, k]
-        for v in self.all_volumes:
-            self.mb.tag_set_data(self.perm_tag, v, perm_tensor)
-            #v_tags=self.mb.tag_get_tags_on_entity(v)
-            #print(self.mb.tag_get_data(v_tags[1],v,flat=True))
+        # for v in self.all_volumes:
+        #     self.mb.tag_set_data(self.perm_tag, v, perm_tensor)
+        #     #v_tags=self.mb.tag_get_tags_on_entity(v)
+        #     #print(self.mb.tag_get_data(v_tags[1],v,flat=True))
+
+        self.mb.tag_set_data(self.perm_tag, self.all_volumes, np.repeat(perm_tensor, len(self.all_volumes)))
 
     def set_area(self, face):
         k2 = self.k_pe_m
@@ -420,10 +421,11 @@ r0 *= k_pe_m
 r1 = 1
 r1 *= k_pe_m
 
-bvd = np.array([np.array([x1-lx, 0.0, 0.0]), np.array([x1, y1, lz])])
-bvn = np.array([np.array([0.0, 0.0, z1-lz]), np.array([lx, y1, z1])])
-# bvd = np.array([np.array([0.0, 0.0, 0.0]), np.array([lx, ly, z1])])
-# bvn = np.array([np.array([x1-lx, y1-ly, 0.0]), np.array([x1, y1, z1])])
+
+# bvd = np.array([np.array([x1-lx, 0.0, 0.0]), np.array([x1, y1, lz])])
+# bvn = np.array([np.array([0.0, 0.0, z1-lz]), np.array([lx, y1, z1])])
+bvd = np.array([np.array([0.0, 0.0, 0.0]), np.array([lx, ly, z1])])
+bvn = np.array([np.array([x1-lx, y1-ly, 0.0]), np.array([x1, y1, z1])])
 '''
 bvd = np.array([np.array([0.0, 0.0, 0.0]), np.array([lx, ly, z1])])
 bvn = np.array([np.array([x1-lx, y1-ly, 0.0]), np.array([x1, y1, z1])])'''

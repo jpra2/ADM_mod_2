@@ -39,6 +39,7 @@ class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
 
         self.k_pe_m = conv.pe_to_m(1.0)
+        # self.k_pe_m = 1.0
 
         self.cfl_ini = 0.9
         self.delta_t_min = 100000
@@ -434,7 +435,7 @@ class bifasico:
         all_ks = self.mb.tag_get_data(self.perm_tag, all_volumes)
         all_gamav = self.mb.tag_get_data(self.gamav_tag, all_volumes, flat=True)
 
-        all_keqs = self.mb.tag_get_data(self.keq_tag, all_faces_in, flat=True)
+        # all_keqs = self.mb.tag_get_data(self.keq_tag, all_faces_in, flat=True)
         all_mobi_in_faces = np.zeros(len(all_faces_in))
         all_s_gravs = all_mobi_in_faces.copy()
         all_fw_in_face = all_mobi_in_faces.copy()
