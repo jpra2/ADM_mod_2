@@ -1,12 +1,12 @@
-input_file: '27x27x27'
+input_file: '30x30x45'
 
-gravity: True
+gravity: False
 # adicionar o efeito da gravidade
 MPFA: False
 # estruturado ou nao
 bifasico: True
 # escoamento bifasico
-ADM: True
+ADM: False
 # solucao multiescala ADM
 
 rs:
@@ -53,6 +53,10 @@ dados_bifasico:
   noil: 2.0
   loops: 1000
   total_time: 1000
+
+dados_monofasico:
+  gama: 10.0
+  mi: 1.0
 
 tempos_vpi_impressao: [0.25, 0.5, 0.75, 0.8, 0.9]
 contar_loop: False

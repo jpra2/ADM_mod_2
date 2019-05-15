@@ -81,10 +81,11 @@ def get_all_tags_2(mb, list_names_tags):
         try:
             tag = mb.tag_get_handle(str(name))
         except:
-            import pdb; pdb.set_trace()
-            print(name)
-            sys.exit(0)
-            import pdb; pdb.set_trace()
+
+            print(name, 'Nao existe no arquivo')
+            continue
+            # sys.exit(0)
+            # import pdb; pdb.set_trace()
 
         tags[name] = tag
 

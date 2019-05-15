@@ -530,6 +530,7 @@ class OtherUtils:
             T[map_global[elems[1]], map_global[elems[0]]] = -keq
             T[map_global[elems[0]], map_global[elems[0]]] += keq
             T[map_global[elems[1]], map_global[elems[1]]] += keq
+            s_grav *= -1
             s[map_global[elems[0]]] += s_grav
             s[map_global[elems[1]]] -= s_grav
             all_keqs.append(keq)

@@ -30,6 +30,7 @@ class malha_adm:
         self.tags['l1_ID'] = mb.tag_get_handle('l1_ID')
         self.tags['l2_ID'] = mb.tag_get_handle('l2_ID')
         self.tags['l3_ID'] = mb.tag_get_handle('l3_ID')
+        # self.tags['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
         self.L2_meshset = mb.tag_get_data(mb.tag_get_handle('L2_MESHSET'), 0, flat=True)[0]
         self.input_file_name = input_file_name
         self.intermediarios = mb.get_entities_by_handle(mb.tag_get_data(self.tags['intermediarios'], 0, flat=True)[0])
