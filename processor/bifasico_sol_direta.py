@@ -8,6 +8,7 @@ import scipy.sparse as sp
 import time
 import conversao as conv
 from utils.others_utils import OtherUtils as oth
+import pdb
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -23,7 +24,8 @@ import importlib.machinery
 class sol_direta_bif:
 
     def __init__(self, mb, mtu, all_volumes, data_loaded):
-        self.k_pe_m = conv.pe_to_m(1.0)
+        # self.k_pe_m = conv.pe_to_m(1.0)
+        self.k_pe_m = 1.0
         self.k2 = 0.9
         self.cfl_ini = self.k2
         self.cfl = self.k2
@@ -79,6 +81,10 @@ class sol_direta_bif:
         self.pf_tag = mb.tag_get_handle('PF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.gamav_tag = mb.tag_get_handle('GAMAV')
         self.gamaf_tag = mb.tag_get_handle('GAMAF')
+        self.boundary_faces = mb.tag_get_handle('FACES_BOUNDARY')
+        self.boundary_faces = mb.tag_get_data(self.boundary_faces, 0, flat=True)
+        self.boundary_faces = mb.get_entities_by_handle(self.boundary_faces)
+
         self.all_centroids = mb.tag_get_data(self.cent_tag, all_volumes)
         self.map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
         self.ids_volumes_tag = mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
@@ -157,6 +163,11 @@ class sol_direta_bif:
 
     def calculate_total_flux(self, volumes, faces):
 
+        p_tag = self.mb.tag_get_handle('P')
+        volumes_d = self.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([p_tag]), np.array([None]))
+        ids_vds = self.mb.tag_get_data(self.ids_volumes_tag, volumes_d, flat=True)
+        p_vds = self.mb.tag_get_data(self.pf_tag, volumes_d, flat=True)
+
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
         # all_gamaf = self.mb.tag_get_data(self.gamaf_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
@@ -195,12 +206,56 @@ class sol_direta_bif:
             fluxos_w[id1] -= flux*fw
             flux_in_faces[i] = flux
 
-        import pdb; pdb.set_trace()
-
         self.mb.tag_set_data(self.total_flux_tag, volumes, fluxos)
         self.mb.tag_set_data(self.flux_w_tag, volumes, fluxos_w)
         self.mb.tag_set_data(self.flux_in_faces_tag, faces, flux_in_faces)
         self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
+
+
+        vv2 = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
+        inds = np.where(vv2 < -1e-10)[0]
+
+        c1 = set(inds)
+        c2 = set(ids_vds)
+        c3 = c1 - c2
+
+        if len(c3) > 0:
+
+            inds = np.array(list(c3))
+            gg = vv2[inds]
+            vols = np.array(volumes)[inds]
+
+            pdb.set_trace()
+
+            faces_vols = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in vols]
+            faces_vols = [rng.intersect(fs, faces) for fs in faces_vols]
+            adjs_vols = [self.mtu.get_bridge_adjacencies(v, 2, 3) for v in vols]
+            sats_adjs = np.array([self.mb.tag_get_data(self.sat_tag, adjs, flat=True) for adjs in adjs_vols])
+            sats_vols = self.mb.tag_get_data(self.sat_tag, vols, flat=True)
+            keqs_faces = []
+            for fs in faces_vols:
+                keqs_faces.append(self.mb.tag_get_data(self.mobi_in_faces_tag, fs, flat=True))
+
+            ttt = []
+            for fs, v in zip(faces_vols, vols):
+                fl = 0.0
+                fs2 = rng.subtract(rng.Range(fs), self.boundary_faces)
+                for f in fs2:
+                    fl0 = self.mb.tag_get_data(self.flux_in_faces_tag, f, flat=True)[0]
+                    fw = self.mb.tag_get_data(self.fw_in_faces_tag, f, flat=True)[0]
+                    adjs = np.array(self.mb.get_adjacencies(f, 3))
+                    sat2 = self.mb.tag_get_data(self.sat_tag, adjs, flat=True)
+                    pf2 = self.mb.tag_get_data(self.pf_tag, adjs, flat=True)
+                    if v == adjs[0]:
+                        fl += fl0*fw
+                    else:
+                        fl -= fl0*fw
+
+                ttt.append(fl)
+
+            pdb.set_trace()
+
+        pdb.set_trace()
 
 
     def calculate_total_flux_v2(self, volumes, faces):
@@ -241,10 +296,6 @@ class sol_direta_bif:
         self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
 
         import pdb; pdb.set_trace()
-
-
-
-
 
     def calculate_sat_dep0(self, volumes, loop):
         """
@@ -388,7 +439,6 @@ class sol_direta_bif:
                 cc = self.mb.create_meshset()
                 self.mb.add_entities(cc, volumes)
                 self.mb.write_file('testt.vtk', [cc])
-
 
                 import pdb; pdb.set_trace()
                 return 1
@@ -802,8 +852,10 @@ class sol_direta_bif:
             uni = np.absolute(direction/norma)
             k0 = np.dot(np.dot(k0, uni), uni)
             k1 = np.dot(np.dot(k1, uni), uni)
-            h = np.dot(self.hs, uni)
-            area = np.dot(self.Areas, uni)
+            # h = np.dot(self.hs, uni)
+            # area = np.dot(self.Areas, uni)
+            area = 1.0
+            h = 1.0
 
             if abs(sat0 - sat1) < lim:
                 all_dfds[i] = 0.0

@@ -8,6 +8,7 @@ import scipy.sparse as sp
 import time
 from processor import conversao as conv
 from utils.others_utils import OtherUtils as oth
+import pdb
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -38,8 +39,8 @@ import importlib.machinery
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
 
-        self.k_pe_m = conv.pe_to_m(1.0)
-        # self.k_pe_m = 1.0
+        # self.k_pe_m = conv.pe_to_m(1.0)
+        self.k_pe_m = 1.0
 
         self.cfl_ini = 0.9
         self.delta_t_min = 100000
@@ -463,8 +464,10 @@ class bifasico:
             uni = np.absolute(direction/norma)
             k0 = np.dot(np.dot(k0, uni), uni)
             k1 = np.dot(np.dot(k1, uni), uni)
-            h = np.dot(self.hs, uni)
-            area = np.dot(self.Areas, uni)
+            # h = np.dot(self.hs, uni)
+            # area = np.dot(self.Areas, uni)
+            area = 1.0
+            h = 1.0
             if abs(sat0-sat1) < lim:
                 all_dfds[i] = 0.0
             else:
@@ -478,7 +481,8 @@ class bifasico:
                 all_fw_in_face[i] = fw1
                 gamaf = gama1
             else:
-                all_mobi_in_faces[i] = ((k0 + k1)/2.0)*(lbt0 + lbt1)/2.0
+                # all_mobi_in_faces[i] = ((k0 + k1)/2.0)*(lbt0 + lbt1)/2.0
+                all_mobi_in_faces[i] = ((2*k0*k1)/(k0+k1))*(lbt0 + lbt1)/2.0
                 all_fw_in_face[i] = (fw0 + fw1)/2.0
                 gamaf = (gama0 + gama1)/2.0
             all_mobi_in_faces[i] *= area/h
@@ -491,6 +495,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
         self.mb.tag_set_data(self.gamaf_tag, all_faces_in, all_gamaf)
+
 
     def set_mobi_faces_dep0(self, volumes, faces, finos0=None):
 

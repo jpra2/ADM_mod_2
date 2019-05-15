@@ -57,6 +57,15 @@ def injector_producer_press(mb):
     mb.tag_set_data(wells_injector_tag, 0, wells_injector_meshset)
     mb.tag_set_data(wells_producer_tag, 0, wells_producer_meshset)
 
+    redefinir_pressoes(mb, injectors, producers, press_tag)
+
+def redefinir_pressoes(mb, wells_injector, wells_producer, press_tag):
+    p1 = 10.0
+    p2 = 1.0
+
+    mb.tag_set_data(press_tag, wells_injector, np.repeat(p1, len(wells_injector)))
+    mb.tag_set_data(press_tag, wells_producer, np.repeat(p2, len(wells_producer)))
+
 def cent(mb, mtu, all_volumes):
     centroids = np.array([mtu.get_average_position([v]) for v in all_volumes])
     cent_tag = mb.tag_get_handle('CENT', 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
@@ -135,3 +144,55 @@ def convert_to_SI(info):
     for i, v in enumerate(all_volumes):
         perm = perms[i]
         mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)
+
+def set_k1_test(mb, perm_tag, all_volumes, all_centroids):
+    k01 = 1.0
+    k02 = 100.0
+
+    k1 = [k01, 0.0, 0.0,
+          0.0, k01, 0.0,
+          0.0, 0.0, k01]
+
+    k2 = [k02, 0.0, 0.0,
+          0.0, k02, 0.0,
+          0.0, 0.0, k02]
+
+    b1 = np.array([np.array([200, 0, 0]), np.array([220, 200, 90])])
+    b2 = np.array([np.array([400, 100, 0]), np.array([420, 300, 90])])
+
+    inds0 = np.where(all_centroids[:,0] > b1[0,0])[0]
+    inds1 = np.where(all_centroids[:,1] > b1[0,1])[0]
+    inds2 = np.where(all_centroids[:,2] > b1[0,2])[0]
+    c1 = set(inds0) & set(inds1) & set(inds2)
+    inds0 = np.where(all_centroids[:,0] < b1[1,0])[0]
+    inds1 = np.where(all_centroids[:,1] < b1[1,1])[0]
+    inds2 = np.where(all_centroids[:,2] < b1[1,2])[0]
+    c2 = set(inds0) & set(inds1) & set(inds2)
+    inds_vols1 = np.array(list(c1 & c2))
+
+    inds0 = np.where(all_centroids[:,0] > b2[0,0])[0]
+    inds1 = np.where(all_centroids[:,1] > b2[0,1])[0]
+    inds2 = np.where(all_centroids[:,2] > b2[0,2])[0]
+    c1 = set(inds0) & set(inds1) & set(inds2)
+    inds0 = np.where(all_centroids[:,0] < b2[1,0])[0]
+    inds1 = np.where(all_centroids[:,1] < b2[1,1])[0]
+    inds2 = np.where(all_centroids[:,2] < b2[1,2])[0]
+    c2 = set(inds0) & set(inds1) & set(inds2)
+    inds_vols2 = np.array(list(c1 & c2))
+
+    volsk1 = rng.Range(np.array(all_volumes)[inds_vols1])
+    volsk2 = rng.Range(np.array(all_volumes)[inds_vols2])
+
+    volsk1 = rng.Range(set(volsk1) | set(volsk2))
+    volsk2 = rng.subtract(all_volumes, volsk1)
+
+    for v in volsk1:
+        mb.tag_set_data(perm_tag, v, k1)
+
+    for v in volsk2:
+        mb.tag_set_data(perm_tag, v , k2)
+
+    testk1_tag = mb.tag_get_handle('testk1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    testk2_tag = mb.tag_get_handle('testk2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    mb.tag_set_data(testk1_tag, volsk1, np.repeat(k01, len(volsk1)))
+    mb.tag_set_data(testk2_tag, volsk2, np.repeat(k02, len(volsk2)))

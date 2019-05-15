@@ -410,7 +410,6 @@ lx *= k_pe_m
 ly *= k_pe_m
 lz *= k_pe_m
 
-
 x1=nx*lx
 y1=ny*ly
 z1=nz*lz

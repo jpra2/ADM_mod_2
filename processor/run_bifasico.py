@@ -14,6 +14,7 @@ from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
 from processor import def_intermediarios as def1
+import pdb
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -28,10 +29,10 @@ out_bif_dir = os.path.join(output_dir, 'bifasico')
 out_bif_soldir_dir =  os.path.join(out_bif_dir, 'sol_direta')
 out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
 
-k_pe_m = conv.pe_to_m(1.0)
-k_md_to_m2 = conv.milidarcy_to_m2(1.0)
-# k_pe_m = 1.0
-# k_md_to_m2 = 1.0
+# k_pe_m = conv.pe_to_m(1.0)
+# k_md_to_m2 = conv.milidarcy_to_m2(1.0)
+k_pe_m = 1.0
+k_md_to_m2 = 1.0
 
 # import importlib.machinery
 
@@ -84,7 +85,10 @@ vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
 
+
+
 bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
+bif_utils.k_pe_m = k_pe_m
 
 bif_utils.gravity = data_loaded['gravity']
 # loader = importlib.machinery.SourceFileLoader('sol_adm_bifasico', parent_dir + '/sol_adm_bifasico.py')
@@ -198,10 +202,14 @@ info['area_tag'] = tags_1['AREA2']
 info['perm_tag'] = tags_1['PERM']
 info['k_eq_tag'] = tags_1['K_EQ']
 
-def1.convert_to_SI(info)
+# def1.convert_to_SI(info)
 del info
 
+os.chdir(flying_dir)
 bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
+def1.set_k1_test(mb, tags_1['PERM'], all_volumes, bif_utils.all_centroids)
+# mb.write_file('testt.vtk', [vv])
+
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
 k00 = 2.0
 k01 = 1e-3
@@ -393,7 +401,7 @@ def run_2(t):
     tend = time.time()
     dtt = tend - tini
     mb.write_file('teste.vtk', [vv])
-    import pdb; pdb.set_trace()
+    pdb.set_trace()
     # print(f'tempo nv0 fluxo {dt}\n')
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)
@@ -408,7 +416,7 @@ def run_2_v2(t):
     vertices_nv1 = rng.subtract(mb.get_entities_by_handle(meshset_vertices), vertices_nv1)
     bif_utils.calculate_pcorr_v3(mb, bound_faces_nv[0], tags_1['PMS2'], tags_1['PCORR2'], vertices_nv1, tags_1, all_volumes)
     mb.write_file('exemplo.vtk', [vv])
-    import pdb; pdb.set_trace()
+    pdb.set_trace()
 
 def run_3(loop):
     print('entrou run3')
@@ -542,8 +550,8 @@ elif ADM == False:
         print('loop: ', loop)
         print('delta_t: ', bifasico.delta_t, '\n')
 
-        if contador > 29:
-            import pdb; pdb.set_trace()
+        if contador > 10:
+            pdb.set_trace()
             contador = 0
 
 
@@ -601,5 +609,5 @@ elif ADM == False:
             bifasico.set_mobi_faces(all_volumes, faces_in)
 
 
-import pdb; pdb.set_trace()
-import pdb; pdb.set_trace()
+pdb.set_trace()
+pdb.set_trace()
