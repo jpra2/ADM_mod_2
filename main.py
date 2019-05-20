@@ -2,6 +2,7 @@ import os
 import yaml
 import shutil
 import sys
+import pdb
 
 deletar = True # deletar os arquivos gerados
 somente_deletar = False # deletar os arquivos e sair do script
@@ -78,6 +79,8 @@ def definir():
     loader.load_module('malha_adm_v01')
 
 # definir()
+#
+# pdb.set_trace()
 
 if bifasico == False:
     loader = importlib.machinery.SourceFileLoader('solucao_adm_mono_v01', processor_dir + '/solucao_adm_mono_v01.py')

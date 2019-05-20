@@ -37,7 +37,7 @@ import importlib.machinery
 
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
-        self.cfl_ini = 0.9
+        self.cfl_ini = 0.5
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
         # self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
@@ -481,7 +481,7 @@ class bifasico:
                 all_fw_in_face[i] = fw1
                 gamaf = gama1
             else:
-                all_mobi_in_faces[i] = ((k0 + k1)/2.0)*(lbt0 + lbt1)/2.0
+                all_mobi_in_faces[i] = ((2*k0*k1)/(k0+k1))*(lbt0 + lbt1)/2.0
                 all_fw_in_face[i] = (fw0 + fw1)/2.0
                 gamaf = (gama0 + gama1)/2.0
             all_mobi_in_faces[i] *= area/h
@@ -1600,7 +1600,7 @@ class bifasico:
         self.Tf2 = Tf.copy()
         self.b2 = b.copy()
 
-    def get_hist_ms(self, t, dt):
+    def get_hist_ms(self, t, dt, loop):
 
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
@@ -1612,9 +1612,8 @@ class bifasico:
         self.vpi += vpi
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
-        historico = np.load('historico.npy')
-        historico = np.append(historico, hist)
-        np.save('historico', historico)
+        name = 'historico_' + str(loop)
+        np.save(name, hist)
 
     def verificar_cfl(self, volumes, loop):
         t0 = time.time()

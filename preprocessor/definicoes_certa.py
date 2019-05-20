@@ -143,7 +143,7 @@ for well in data_loaded['Wells_structured']:
 
 if bifasico == True:
     loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
-    bif_utils = loader.load_module('bif_utils').bifasico(M1.mb, M1.mtu, M1.all_volumes)
+    bif_utils = loader.load_module('bif_utils').bifasico(M1.mb, M1.mtu, M1.all_volumes, data_loaded)
     bif_utils.set_sat_in(M1.all_volumes)
     bif_utils.set_lamb(M1.all_volumes)
     bif_utils.set_mobi_faces_ini(M1.all_volumes, rng.subtract(M1.all_faces, M1.all_boundary_faces))
