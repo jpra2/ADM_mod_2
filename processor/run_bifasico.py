@@ -43,20 +43,21 @@ import importlib.machinery
 # adm_mesh = loader.load_module('malha_adm')
 definter.create_names_tags()
 mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded = utpy.load_adm_mesh()
+
 # tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
 tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 
 definter.def_inter(mb, tags_1)
 
 os.chdir(flying_dir)
-# faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
-# intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
+faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
+intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
-# definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
-definter.injector_producer(mb)
+definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
+# definter.injector_producer(mb)
 # tags = [tags_1['l1_ID'], tags_1['l2_ID']]
 # for tag in tags:
 #     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
@@ -223,8 +224,8 @@ def run_PMS(n1_adm, n2_adm, loop):
 
     # OP1_AMS = sol_adm.get_OP1_AMS_structured(As)
     #
-    OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
-    # OP1_AMS = prol_tpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, sol_adm.ni, sol_adm.nf, bif_utils.mobi_in_faces_tag, As)
+    # OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
+    OP1_AMS = prol_tpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, sol_adm.ni, sol_adm.nf, bif_utils.mobi_in_faces_tag, As)
     OP1_ADM, OR1_ADM = sol_adm.organize_OP1_ADM(mb, OP1_AMS, all_volumes, tags_1)
 
     # sp.save_npz('OP1_AMS', OP1_AMS)
@@ -434,17 +435,23 @@ verif_imp = False
 cont_imp = 0
 verif_vpi = False
 contador = 0
+ver9 = 1
 
 if ADM:
+    list_tempos = []
+    tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
 
-    while verif:
-        contador += 1
-        if contador > 29:
-            contador = 0
-            pdb.set_trace()
+    with open('tempos_simulacao_adm', 'w') as fil:
+        pass
 
+    while verif:
         t0 = time.time()
+        contador += 1
+        # if contador > 29:
+        #     contador = 0
+        #     pdb.set_trace()
+
         t, loop = run(t, loop)
 
 
@@ -496,8 +503,19 @@ if ADM:
         if verif:
             run_3(loop)
 
+        t3 = time.time()
+        dt = t3-t0
+
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
+
+        with open('tempos_simulacao_adm', 'a+') as fil:
+            fil.write(str(dt)+'\n')
+
+
+
+
+    tfim = time.time()
 
 elif ADM == False:
     os.chdir(bifasico_sol_direta_dir)
@@ -515,8 +533,15 @@ elif ADM == False:
     bifasico.loops = bif_utils.loops
     bifasico.total_time = bif_utils.total_time
     bifasico.gama = bif_utils.gama
+    with open('tempos_simulacao_direta', 'w') as fil:
+        pass
+
+    tini = time.time()
 
     while verif:
+
+        contador += 1
+        list_tempos = []
 
         t0 = time.time()
         bifasico.solution_PF(sol_adm.wirebasket_elems, map_global, faces_in, tags_1)
@@ -580,6 +605,13 @@ elif ADM == False:
             # bifasico.verificar_cfl(all_volumes, loop)
             bifasico.set_lamb(all_volumes)
             bifasico.set_mobi_faces(all_volumes, faces_in)
+
+        t3 = time.time()
+        dt = t3-t0
+        with open('tempos_simulacao_direta', 'a+') as fil:
+            fil.write(str(dt)+'\n')
+
+    tfim = time.time()
 
 
 import pdb; pdb.set_trace()
