@@ -49,13 +49,14 @@ tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 definter.def_inter(mb, tags_1)
 
 os.chdir(flying_dir)
-faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
-intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
+# faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
+# intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
-definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
+# definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
+definter.injector_producer(mb)
 # tags = [tags_1['l1_ID'], tags_1['l2_ID']]
 # for tag in tags:
 #     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
@@ -222,8 +223,8 @@ def run_PMS(n1_adm, n2_adm, loop):
 
     # OP1_AMS = sol_adm.get_OP1_AMS_structured(As)
     #
-    # OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
-    OP1_AMS = prol_tpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, sol_adm.ni, sol_adm.nf, bif_utils.mobi_in_faces_tag, As)
+    OP1_AMS = prol_tpfa.get_op_AMS_TPFA(As)
+    # OP1_AMS = prol_tpfa.get_op_AMS_TPFA_top(mb, faces_adjs_by_dual, intern_adjs_by_dual, sol_adm.ni, sol_adm.nf, bif_utils.mobi_in_faces_tag, As)
     OP1_ADM, OR1_ADM = sol_adm.organize_OP1_ADM(mb, OP1_AMS, all_volumes, tags_1)
 
     # sp.save_npz('OP1_AMS', OP1_AMS)
@@ -394,6 +395,7 @@ def run_3(loop):
     bif_utils.set_lamb(all_volumes)
     t2 = time.time()
     bif_utils.set_mobi_faces(all_volumes, faces_in, finos0=finos0)
+    bif_utils.set_finos(finos0, meshsets_nv1)
     t3 = time.time()
     adm_mesh.generate_adm_mesh(mb, all_volumes, loop=loop)
     t4 = time.time()

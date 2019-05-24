@@ -40,6 +40,7 @@ def injector_producer(mb):
 def injector_producer_press(mb, mtu, gama_w, gama_o, gravity, all_nodes):
     press_tag = mb.tag_get_handle('P')
     volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([press_tag]), np.array([None]))
+    values = mb.tag_get_data(press_tag, volumes_d, flat=True)
     wells_injector_tag = mb.tag_get_handle('WELLS_INJECTOR', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
     wells_producer_tag = mb.tag_get_handle('WELLS_PRODUCER', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
     wells_injector_meshset = mb.create_meshset()
