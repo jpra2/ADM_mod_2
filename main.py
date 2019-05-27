@@ -20,8 +20,14 @@ if deletar:
     bifasico_dir = os.path.join(flying_dir, 'bifasico')
     sol_direta = os.path.join(bifasico_dir, 'sol_direta')
     sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
-    shutil.rmtree(sol_multi)
-    shutil.rmtree(sol_direta)
+    try:
+        shutil.rmtree(sol_multi)
+    except:
+        pass
+    try:
+        shutil.rmtree(sol_direta)
+    except:
+        pass
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
     os.chdir(sol_direta)
@@ -35,8 +41,14 @@ if deletar:
     bifasico_dir = os.path.join(output_dir, 'bifasico')
     sol_direta = os.path.join(bifasico_dir, 'sol_direta')
     sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
-    shutil.rmtree(sol_multi)
-    shutil.rmtree(sol_direta)
+    try:
+        shutil.rmtree(sol_multi)
+    except:
+        pass
+    try:
+        shutil.rmtree(sol_direta)
+    except:
+        pass
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
     os.chdir(sol_direta)

@@ -5,6 +5,8 @@
 *.h5m
 *.vtk
 *.msh
+*tempos_simulacao_adm.txt
+*tempos_simulacao_direta.txt
 
 
 *As.yaml

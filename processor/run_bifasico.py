@@ -442,7 +442,7 @@ if ADM:
     tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
 
-    with open('tempos_simulacao_adm', 'w') as fil:
+    with open('tempos_simulacao_adm.txt', 'w') as fil:
         pass
 
     while verif:
@@ -509,7 +509,7 @@ if ADM:
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
 
-        with open('tempos_simulacao_adm', 'a+') as fil:
+        with open('tempos_simulacao_adm.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
 
@@ -533,7 +533,7 @@ elif ADM == False:
     bifasico.loops = bif_utils.loops
     bifasico.total_time = bif_utils.total_time
     bifasico.gama = bif_utils.gama
-    with open('tempos_simulacao_direta', 'w') as fil:
+    with open('tempos_simulacao_direta.txt', 'w') as fil:
         pass
 
     tini = time.time()
@@ -608,7 +608,7 @@ elif ADM == False:
 
         t3 = time.time()
         dt = t3-t0
-        with open('tempos_simulacao_direta', 'a+') as fil:
+        with open('tempos_simulacao_direta.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
     tfim = time.time()

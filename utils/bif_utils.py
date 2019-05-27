@@ -8,6 +8,7 @@ import scipy.sparse as sp
 import time
 from processor import conversao as conv
 from utils.others_utils import OtherUtils as oth
+import pdb
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -445,6 +446,7 @@ class bifasico:
         all_dfds = all_mobi_in_faces.copy()
         all_gamaf = all_mobi_in_faces.copy()
         Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        self.Adjs = Adjs
 
         for i, face in enumerate(all_faces_in):
             elems = Adjs[i]
@@ -987,7 +989,18 @@ class bifasico:
             fluxos_w[id1] -= flux*fw
             flux_in_faces[i] = flux
 
-        ids_volumes = [map_local[v] for v in volumes]
+        # pdb.set_trace()
+        # tt = np.where(fluxos_w < 0)[0]
+        # vols_tt = np.array(volumes_2)[tt]
+        # vols_injector = np.array(self.wells_injector)
+        # vols_producer = np.array(self.wells_producer)
+        # map_vols_injector = [map_local[v] for v in vols_injector]
+        # fl_injector = fluxos_w[map_vols_injector]
+        # ff = np.setdiff1d(vols_tt, vols_injector)
+        # pdb.set_trace()
+
+        # ids_volumes = [map_local[v] for v in volumes]
+        ids_volumes = list((map_local[v] for v in volumes))
         fluxos = fluxos[ids_volumes]
         fluxos_w = fluxos_w[ids_volumes]
 
@@ -1048,6 +1061,8 @@ class bifasico:
                 qw_out = flux*fw
             else:
                 qw_out = 0.0
+                fw = None
+                flux = None
 
             sat = sat1 + (qw - qw_out)*(self.delta_t/(fi*V))
             # sat = sat1 + qw*(self.delta_t/(self.fimin*self.Vmin))
@@ -1058,7 +1073,7 @@ class bifasico:
             if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
                 sat = 0.8
 
-            elif sat > 0.8:
+            elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
                 print("Sat > 0.8")
                 print(sat)
@@ -1070,6 +1085,11 @@ class bifasico:
 
                 # sat = 0.8
                 return True
+
+            elif sat < self.Swc:
+                pdb.set_trace()
+                print('erro2')
+
 
             # elif sat > sat1 + 0.2:
             #     print('sat > sat1')
