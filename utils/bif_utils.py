@@ -751,7 +751,7 @@ class bifasico:
                 all_mobi_in_faces[i] = k1*lbt1
                 all_fw_in_face[i] = fw1
                 gamaf = gama1
-                # continue
+                continue
             elif flux_in_face < 0:
                 all_mobi_in_faces[i] = k0*(lbt0)
                 all_fw_in_face[i] = fw0
@@ -1022,6 +1022,9 @@ class bifasico:
         all_fw = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
         all_total_flux = self.mb.tag_get_data(self.total_flux_tag, volumes, flat=True)
         # all_Vs = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
+        # vv = self.mb.create_meshset()
+        # self.mb.add_entities(vv, volumes)
+        # self.mb.write_file('testtt.vtk', [vv])
 
         sats_2 = np.zeros(len(volumes))
 
@@ -1089,6 +1092,7 @@ class bifasico:
             elif sat < self.Swc:
                 pdb.set_trace()
                 print('erro2')
+                pass
 
 
             # elif sat > sat1 + 0.2:

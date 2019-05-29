@@ -18,7 +18,7 @@ k_psi_to_pa = 1.0
 
 def def_inter(mb, dict_tags):
     intermediarios_tag = mb.tag_get_handle('intermediarios', 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
-    elems_nivel2 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array(2))
+    elems_nivel2 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array([2]))
     intermediarios_meshset = mb.create_meshset()
     mb.add_entities(intermediarios_meshset, elems_nivel2)
     mb.tag_set_data(intermediarios_tag, 0, intermediarios_meshset)

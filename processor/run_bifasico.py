@@ -53,7 +53,7 @@ os.chdir(flying_dir)
 faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
 intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
-adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
+adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
 all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
 definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
