@@ -67,12 +67,20 @@ class malha_adm:
             meshset_by_L1= mb.get_child_meshsets(m2)
             for m1 in meshset_by_L1:
                 elem_by_L1 = mb.get_entities_by_handle(m1)
-                for elem1 in elem_by_L1:
-                    if elem1 in finos:
-                        aux=1
-                        tem_poço_no_vizinho=True
-                    if elem1 in intermediarios:
-                        tem_poço_no_vizinho=True
+                int_finos = set(elem_by_L1) & set(finos)
+                int_interm = set(elem_by_L1) & set(intermediarios)
+                # for elem1 in elem_by_L1:
+                #     if elem1 in finos:
+                #         aux=1
+                #         tem_poço_no_vizinho=True
+                #     if elem1 in intermediarios:
+                #         tem_poço_no_vizinho=True
+                if int_finos:
+                    aux=1
+                    tem_poço_no_vizinho=True
+                if int_interm:
+                    tem_poço_no_vizinho=True
+
                 if aux==1:
                     aux=0
                     for elem in elem_by_L1:
@@ -88,7 +96,6 @@ class malha_adm:
                         # finos = rng.unite(finos, rng.Range(elem))
 
                         level = 1
-
                         id_elem = map_volumes[elem]
                         list_L1_ID[id_elem] = n1
                         list_L2_ID[id_elem] = n2
