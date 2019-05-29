@@ -8,6 +8,7 @@ import scipy.sparse as sp
 import time
 import conversao as conv
 from utils.others_utils import OtherUtils as oth
+import pdb
 
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -271,6 +272,7 @@ class sol_direta_bif:
         delta_sat = 0.001
         t1 = time.time()
         lim = 1e-10
+        lim_qw = 9e-8
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
@@ -290,6 +292,8 @@ class sol_direta_bif:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
+            if qw < 0 and abs(qw) < lim_qw:
+                qw = 0.0
 
             # if abs(qw) < lim:
             #     sats_2[i] = sat1
@@ -326,8 +330,10 @@ class sol_direta_bif:
             #     return True
             if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
                 sat = 0.8
+            elif sat > 0.2 + delta_sat and sat < 0.2 - delta_sat:
+                sat = 0.2
 
-            elif sat > 0.8:
+            elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
                 print("Sat > 0.8")
                 print(sat)
@@ -346,6 +352,11 @@ class sol_direta_bif:
             #     print(f'sat: {sat}')
             #     print(f'sat1: {sat1}\n')
             #     return 1
+
+            elif sat < self.Swc:
+                pdb.set_trace()
+                print('erro2')
+                pass
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:

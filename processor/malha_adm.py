@@ -67,8 +67,8 @@ class malha_adm:
             meshset_by_L1= mb.get_child_meshsets(m2)
             for m1 in meshset_by_L1:
                 elem_by_L1 = mb.get_entities_by_handle(m1)
-                int_finos = set(elem_by_L1) & set(finos)
-                int_interm = set(elem_by_L1) & set(intermediarios)
+                int_finos = set(elem_by_L1) & set(finos) # interseccao do elementos do meshset com os volumes do nivel1
+                int_interm = set(elem_by_L1) & set(intermediarios) # interseccao do elementos do meshset com os volumes do nivel2
                 # for elem1 in elem_by_L1:
                 #     if elem1 in finos:
                 #         aux=1
@@ -325,6 +325,110 @@ class malha_adm:
                     n1 += nn1
                     n2 += nn1
                 continue
+
+        mb.tag_set_data(self.tags['l1_ID'], all_volumes, list_L1_ID)
+        mb.tag_set_data(self.tags['l2_ID'], all_volumes, list_L2_ID)
+        mb.tag_set_data(self.tags['l3_ID'], all_volumes, list_L3_ID)
+
+    def generate_adm_mesh_v3(self, mb, all_volumes, loop=0):
+
+        nn = len(all_volumes)
+        map_volumes = dict(zip(all_volumes, range(nn)))
+
+        list_L1_ID = np.ones(nn, dtype = np.int32)
+        list_L2_ID = list_L1_ID.copy()
+        list_L3_ID = list_L1_ID.copy()
+
+        L2_meshset = self.L2_meshset
+        finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
+        finos = list(mb.get_entities_by_handle(finos))
+        intermediarios = self.intermediarios
+        ######################################################################
+        # ni = ID do elemento no nível i
+        n1=0
+        n2=0
+        aux=0
+        meshset_by_L2 = mb.get_child_meshsets(self.L2_meshset)
+        print('\n')
+        print("INICIOU GERAÇÃO DA MALHA ADM")
+        print('\n')
+        tempo0_ADM=time.time()
+        t0 = tempo0_ADM
+        for m2 in meshset_by_L2:
+            tem_poço_no_vizinho=False
+            meshset_by_L1= mb.get_child_meshsets(m2)
+            for m1 in meshset_by_L1:
+                elem_by_L1 = mb.get_entities_by_handle(m1)
+                int_finos = set(elem_by_L1) & set(finos) # interseccao do elementos do meshset com os volumes do nivel1
+                int_interm = set(elem_by_L1) & set(intermediarios) # interseccao do elementos do meshset com os volumes do nivel2
+                # for elem1 in elem_by_L1:
+                #     if elem1 in finos:
+                #         aux=1
+                #         tem_poço_no_vizinho=True
+                #     if elem1 in intermediarios:
+                #         tem_poço_no_vizinho=True
+                if int_finos:
+                    aux=1
+                    tem_poço_no_vizinho=True
+                if int_interm:
+                    tem_poço_no_vizinho=True
+
+                if aux==1:
+                    aux=0
+                    level = 1
+                    finos += list(elem_by_L1)
+                    ids_elem = list((map_volumes[elem] for elem in elem_by_L1))
+                    nn1 = len(elem_by_L1)
+                    ids_l1 = np.arange(n1, n1+nn1)
+                    ids_l2 = np.arange(n2, n2+nn1)
+                    list_L1_ID[ids_elem] = ids_l1
+                    list_L2_ID[ids_elem] = ids_l2
+                    list_L3_ID[ids_elem] = np.repeat(level, nn1)
+                    n1 += nn1
+                    n2 += nn1
+
+            if tem_poço_no_vizinho:
+                for m1 in meshset_by_L1:
+                    elem_by_L1 = mb.get_entities_by_handle(m1)
+                    conj = rng.subtract(elem_by_L1, finos)
+                    if len(conj) > 0:
+                        level = 2
+                        id_elem = list((map_volumes[elem] for elem in elem_by_L1))
+                        list_L1_ID[id_elem] = np.repeat(n1, len(elem_by_L1))
+                        list_L2_ID[id_elem] = np.repeat(n2, len(elem_by_L1))
+                        list_L3_ID[id_elem] = np.repeat(level, len(elem_by_L1))
+                        n1 += 1
+                        n2 += 1
+
+            else:
+                level = 3
+                for m1 in meshset_by_L1:
+                    elem_by_L1 = mb.get_entities_by_handle(m1)
+                    id_elem = list((map_volumes[elem] for elem in elem_by_L1))
+                    list_L1_ID[id_elem] = np.repeat(n1, len(elem_by_L1))
+                    n1 += 1
+
+                elem_by_L2 = mb.get_entities_by_handle(m2)
+                id_elem = list((map_volumes[elem] for elem in elem_by_L2))
+                list_L2_ID[id_elem] = np.repeat(n2, len(elem_by_L2))
+                list_L3_ID[id_elem] = np.repeat(level, len(elem_by_L2))
+                n2 += 1
+
+
+        # ------------------------------------------------------------------------------
+        print('Definição da malha ADM: ',time.time()-t0)
+        t0=time.time()
+
+        # fazendo os ids comecarem de 0 em todos os niveis
+        # tags = [self.tags['l1_ID'], self.tags['l2_ID']]
+        # for tag in tags:
+        #     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
+        #     minim = all_gids.min()
+        #     all_gids -= minim
+        #     mb.tag_set_data(tag, all_volumes, all_gids)
+
+        list_L1_ID -= list_L1_ID.min()
+        list_L2_ID -= list_L2_ID.min()
 
         mb.tag_set_data(self.tags['l1_ID'], all_volumes, list_L1_ID)
         mb.tag_set_data(self.tags['l2_ID'], all_volumes, list_L2_ID)

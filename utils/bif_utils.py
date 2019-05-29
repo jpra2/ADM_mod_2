@@ -1017,6 +1017,13 @@ class bifasico:
         t1 = time.time()
         lim = 1e-4
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
+
+        inds = np.where(all_qw<0)[0]
+        volumes_inds = rng.Range(np.array(volumes)[inds])
+        volumes_inds = rng.subtract(volumes_inds, self.wells_injector)
+        tag_ident1 = self.mb.tag_get_handle('identificador1', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+        self.mb.tag_set_data(tag_ident1, volumes_inds, np.repeat(1, len(volumes_inds)))
+
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
         all_volumes = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
@@ -1033,7 +1040,7 @@ class bifasico:
             # gid = mb.tag_get_data(self.global_id_tag, volume, flat=True)[0]
             sat1 = all_sats[i]
             V = all_volumes[i]
-            if volume in self.wells_injector or sat1 == 0.8:
+            if volume in self.wells_injector or sat1 == 1-self.Sor:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
@@ -1078,6 +1085,8 @@ class bifasico:
             #     return True
             if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
                 sat = 0.8
+            elif sat > 0.2 + delta_sat and sat < 0.2 - delta_sat:
+                sat = 0.2
 
             elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
