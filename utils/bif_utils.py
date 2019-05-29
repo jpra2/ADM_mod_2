@@ -1013,6 +1013,7 @@ class bifasico:
         calcula a saturacao do passo de tempo corrente
         """
         delta_sat = 0.001
+        lim_qw = 9e-8
         t1 = time.time()
         lim = 1e-4
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
@@ -1036,6 +1037,8 @@ class bifasico:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
+            if qw < 0 and abs(qw) < lim_qw:
+                qw = 0.0
 
             # if abs(qw) < lim:
             #     sats_2[i] = sat1

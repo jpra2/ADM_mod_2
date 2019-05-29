@@ -101,6 +101,17 @@ class malha_adm:
                         list_L2_ID[id_elem] = n2
                         list_L3_ID[id_elem] = level
 
+                    # level = 1
+                    # finos += list(elem_by_L1)
+                    # ids_elem = list(map_volumes[elem] for elem in elem_by_L1)
+                    # nn1 = len(elem_by_L1)
+                    # ids_l1 = np.arange(n1, n1+nn1)
+                    # ids_l2 = np.arange(n2, n2+nn1)
+                    # list_L1_ID[ids_elem] = ids_l1
+                    # list_L2_ID[ids_elem] = ids_l2
+                    # list_L3_ID[ids_elem] = np.repeat(level, nn1)
+                    # n1 += nn1
+                    # n2 += nn1
 
             if tem_poço_no_vizinho:
                 for m1 in meshset_by_L1:
@@ -121,7 +132,6 @@ class malha_adm:
                             list_L1_ID[id_elem] = n1
                             list_L2_ID[id_elem] = n2
                             list_L3_ID[id_elem] = level
-
 
                     n1-=t
                     n2-=t
