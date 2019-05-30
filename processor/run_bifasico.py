@@ -512,6 +512,8 @@ if ADM:
         with open('tempos_simulacao_adm.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
+        pdb.set_trace()
+
 
 
 

@@ -331,7 +331,7 @@ class malha_adm:
         mb.tag_set_data(self.tags['l2_ID'], all_volumes, list_L2_ID)
         mb.tag_set_data(self.tags['l3_ID'], all_volumes, list_L3_ID)
 
-    def generate_adm_mesh(self, mb, all_volumes, loop=0):
+    def generate_adm_mesh_v3(self, mb, all_volumes, loop=0):
 
         nn = len(all_volumes)
         map_volumes = dict(zip(all_volumes, range(nn)))
@@ -445,6 +445,121 @@ class malha_adm:
         # mb.add_entities(vv, all_volumes)
         # mb.write_file('outro.vtk', [vv])
 
+
+        mb.tag_set_data(self.tags['l1_ID'], volumes, list_L1_ID)
+        mb.tag_set_data(self.tags['l2_ID'], volumes, list_L2_ID)
+        mb.tag_set_data(self.tags['l3_ID'], volumes, list_L3_ID)
+
+    def generate_adm_mesh(self, mb, all_volumes, loop=0):
+
+        nn = len(all_volumes)
+        meshsets_nv1 = set() # volumes do nivel 1 que sao nivel 1
+        meshsets_nv2 = set() # meshsets do nivel 2
+        meshsets_nv3 = set() # meshsets do nivel 3
+
+        list_L1_ID = []
+        list_L2_ID = []
+        list_L3_ID = []
+        volumes = []
+
+        finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
+        finos = set(mb.get_entities_by_handle(finos))
+        intermediarios2 = set(rng.subtract(self.mtu.get_bridge_adjacencies(rng.Range(finos), 2, 3), rng.Range(finos)))
+        intermediarios = (set(self.intermediarios) - finos) | intermediarios2
+        ######################################################################
+        # ni = ID do elemento no nível i
+        n1=0
+        n2=0
+        n_vols = 0
+        meshset_by_L2 = mb.get_child_meshsets(self.L2_meshset)
+        print('\n')
+        print("INICIOU GERAÇÃO DA MALHA ADM")
+        print('\n')
+        tempo0_ADM=time.time()
+        t0 = tempo0_ADM
+        for m2 in meshset_by_L2:
+            #1
+            meshsets_nv2aqui = set()
+            n_vols_l3 = 0
+            nivel3 = True
+            nivel2 = False
+            nivel1 = False
+            meshset_by_L1 = mb.get_child_meshsets(m2)
+            for m1 in meshset_by_L1:
+                #2
+                meshsets_nv2aqui.add(m1)
+                elem_by_L1 = mb.get_entities_by_handle(m1)
+                nn1 = len(elem_by_L1)
+                n_vols += nn1
+                n_vols_l3 += nn1
+                int_finos = set(elem_by_L1) & finos # interseccao do elementos do meshset com os volumes do nivel1
+                int_interm = set(elem_by_L1) & intermediarios # interseccao do elementos do meshset com os volumes do nivel2
+                if int_finos:
+                    #3
+                    volumes.append(elem_by_L1)
+                    meshsets_nv1.add(m1)
+                    nivel3 = False
+                    nivel1 = True
+                    level = 1
+                    list_L1_ID.append(np.arange(n1, n1+nn1))
+                    list_L2_ID.append(np.arange(n2, n2+nn1))
+                    list_L3_ID.append(np.repeat(level, nn1))
+                    n1 += nn1
+                    n2 += nn1
+                #2
+                elif int_interm:
+                    #3
+                    volumes.append(elem_by_L1)
+                    meshsets_nv2.add(m1)
+                    nivel3 = False
+                    nivel2 = True
+                    level = 2
+                    list_L1_ID.append(np.repeat(n1, nn1))
+                    list_L2_ID.append(np.repeat(n2, nn1))
+                    list_L3_ID.append(np.repeat(level, nn1))
+                    n1 += 1
+                    n2 += 1
+            #1
+            if nivel3:
+                #2
+                level = 3
+                for m1 in meshset_by_L1:
+                    #3
+                    elem_by_L1 = mb.get_entities_by_handle(m1)
+                    nn1 = len(elem_by_L1)
+                    volumes.append(elem_by_L1)
+                    list_L1_ID.append(np.repeat(n1, nn1))
+                    n1 += 1
+                #2
+                list_L2_ID.append(np.repeat(n2, n_vols_l3))
+                list_L3_ID.append(np.repeat(level, n_vols_l3))
+                n2 += 1
+            #1
+            elif nivel2:
+                #2
+                meshsets_fora = meshsets_nv2aqui - meshsets_nv2
+                if nivel1:
+                    #3
+                    meshsets_fora = meshsets_fora - meshsets_nv1
+                #2
+                if meshsets_fora:
+                    #3
+                    for m1 in meshsets_fora:
+                        #4
+                        elem_by_L1 = mb.get_entities_by_handle(m1)
+                        volumes.append(elem_by_L1)
+                        nn1 = len(elem_by_L1)
+                        level = 2
+                        list_L1_ID.append(np.repeat(n1, nn1))
+                        list_L2_ID.append(np.repeat(n2, nn1))
+                        list_L3_ID.append(np.repeat(level, nn1))
+                        n1 += 1
+                        n2 += 1
+
+        volumes = np.concatenate(volumes)
+        list_L1_ID = np.concatenate(list_L1_ID)
+        list_L2_ID = np.concatenate(list_L2_ID)
+        list_L3_ID = np.concatenate(list_L3_ID)
 
         mb.tag_set_data(self.tags['l1_ID'], volumes, list_L1_ID)
         mb.tag_set_data(self.tags['l2_ID'], volumes, list_L2_ID)
