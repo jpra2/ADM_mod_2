@@ -328,10 +328,10 @@ class sol_direta_bif:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
-                sat = 0.8
-            elif sat > 0.2 + delta_sat and sat < 0.2 - delta_sat:
-                sat = 0.2
+            if sat > (1-self.Sor) - delta_sat and sat < ((1-self.Sor)) + delta_sat:
+                sat = 1-self.Sor
+            elif sat > self.Swc - delta_sat and sat < self.Swc + delta_sat:
+                sat = self.Swc
 
             elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
