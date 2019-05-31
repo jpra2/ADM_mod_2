@@ -453,9 +453,10 @@ class malha_adm:
     def generate_adm_mesh(self, mb, all_volumes, loop=0):
 
         nn = len(all_volumes)
-        meshsets_nv1 = set() # volumes do nivel 1 que sao nivel 1
-        meshsets_nv2 = set() # meshsets do nivel 2
-        meshsets_nv3 = set() # meshsets do nivel 3
+        # meshsets do nivel 3
+        meshsets_nv1 = set()
+        meshsets_nv2 = set()
+        meshsets_nv2 = set()
 
         list_L1_ID = []
         list_L2_ID = []
@@ -464,8 +465,8 @@ class malha_adm:
 
         finos = mb.tag_get_data(self.tags['finos'], 0, flat=True)[0]
         finos = set(mb.get_entities_by_handle(finos))
-        intermediarios2 = set(rng.subtract(self.mtu.get_bridge_adjacencies(rng.Range(finos), 2, 3), rng.Range(finos)))
-        intermediarios = (set(self.intermediarios) - finos) | intermediarios2
+        # intermediarios2 = set(rng.subtract(self.mtu.get_bridge_adjacencies(rng.Range(finos), 2, 3), rng.Range(finos)))
+        intermediarios = set(self.intermediarios) - finos
         ######################################################################
         # ni = ID do elemento no nível i
         n1=0
@@ -479,15 +480,14 @@ class malha_adm:
         t0 = tempo0_ADM
         for m2 in meshset_by_L2:
             #1
-            meshsets_nv2aqui = set()
             n_vols_l3 = 0
             nivel3 = True
             nivel2 = False
             nivel1 = False
             meshset_by_L1 = mb.get_child_meshsets(m2)
+            meshsets_nv2aqui = set(meshset_by_L1)
             for m1 in meshset_by_L1:
                 #2
-                meshsets_nv2aqui.add(m1)
                 elem_by_L1 = mb.get_entities_by_handle(m1)
                 nn1 = len(elem_by_L1)
                 n_vols += nn1
@@ -535,12 +535,9 @@ class malha_adm:
                 list_L3_ID.append(np.repeat(level, n_vols_l3))
                 n2 += 1
             #1
-            elif nivel2:
+            else:
                 #2
-                meshsets_fora = meshsets_nv2aqui - meshsets_nv2
-                if nivel1:
-                    #3
-                    meshsets_fora = meshsets_fora - meshsets_nv1
+                meshsets_fora = meshsets_nv2aqui - (meshsets_nv2 | meshsets_nv1)
                 #2
                 if meshsets_fora:
                     #3
@@ -555,6 +552,7 @@ class malha_adm:
                         list_L3_ID.append(np.repeat(level, nn1))
                         n1 += 1
                         n2 += 1
+
 
         volumes = np.concatenate(volumes)
         list_L1_ID = np.concatenate(list_L1_ID)

@@ -437,6 +437,9 @@ verif_vpi = False
 contador = 0
 ver9 = 1
 
+vf = mb.create_meshset()
+mb.add_entities(vf, all_faces)
+
 if ADM:
     list_tempos = []
     tini = time.time()
@@ -512,8 +515,7 @@ if ADM:
         with open('tempos_simulacao_adm.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
-        if contador == 3:
-            contador = 0
+        if contador % 3:
             os.system('clear')
 
 
