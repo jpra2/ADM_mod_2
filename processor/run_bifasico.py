@@ -494,7 +494,7 @@ if ADM:
             os.chdir(bifasico_sol_multiescala_dir)
             verif_vpi = False
 
-        mb.write_file(ext_h5m)
+        # mb.write_file(ext_h5m)
         print(f'loop: {loop}')
 
         if t2 > bif_utils.total_time or loop2 > bif_utils.loops or bif_utils.vpi > 0.99:
@@ -512,9 +512,9 @@ if ADM:
         with open('tempos_simulacao_adm.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
-        pdb.set_trace()
-
-
+        if contador == 3:
+            contador = 0
+            os.system('clear')
 
 
     tfim = time.time()
@@ -612,6 +612,10 @@ elif ADM == False:
         dt = t3-t0
         with open('tempos_simulacao_direta.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
+
+        if contador == 3:
+            contador = 0
+            os.system('clear')
 
     tfim = time.time()
 
