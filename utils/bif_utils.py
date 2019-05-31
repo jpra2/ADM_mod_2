@@ -1085,7 +1085,7 @@ class bifasico:
             #     return True
             if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
                 sat = 0.8
-            elif sat > 0.2 + delta_sat and sat < 0.2 - delta_sat:
+            elif sat > 0.2 - delta_sat and sat < 0.2 + delta_sat:
                 sat = 0.2
 
             elif sat > 1-self.Sor:
