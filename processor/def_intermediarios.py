@@ -84,7 +84,7 @@ def create_names_tags():
     os.chdir(flying_dir)
     names = ['d1', 'd2', 'l1_ID', 'l2_ID', 'l3_ID', 'P', 'Q', 'FACES_BOUNDARY', 'FACES_BOUNDARY_MESHSETS_LEVEL_2', 'FACES_BOUNDARY_MESHSETS_LEVEL_3',
              'FINE_TO_PRIMAL1_CLASSIC', 'FINE_TO_PRIMAL2_CLASSIC', 'PRIMAL_ID_1', 'PRIMAL_ID_2', 'L2_MESHSET', 'ID_reord_tag', 'CENT', 'AREA',
-             'AREA2', 'PERM', 'K_EQ']
+             'AREA2', 'PERM', 'K_EQ', 'KHARM']
 
     names2 = ['WELLS_PRODUCER', 'WELLS_INJECTOR']
     nn = np.array(names)

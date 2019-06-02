@@ -84,6 +84,7 @@ class bifasico:
         # self.lbt_tag = mb.tag_get_handle('LBT')
         self.lbt_tag = mb.tag_get_handle('LBT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.keq_tag = mb.tag_get_handle('K_EQ')
+        self.kharm_tag = mb.tag_get_handle('KHARM')
         # self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES')
         self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         # self.fw_in_faces_tag = mb.tag_get_handle('FW_IN_FACES')
@@ -424,7 +425,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini_dep1(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
@@ -487,6 +488,70 @@ class bifasico:
                 all_fw_in_face[i] = (fw0 + fw1)/2.0
                 gamaf = (gama0 + gama1)/2.0
             all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
+
+        self.mb.tag_set_data(self.mobi_in_faces_tag, all_faces_in, all_mobi_in_faces)
+        self.mb.tag_set_data(self.s_grav_tag, all_faces_in, all_s_gravs)
+        self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
+        self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, all_faces_in, all_gamaf)
+
+    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+        lim = 1e-5
+
+        map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
+
+        all_lbt = self.mb.tag_get_data(self.lbt_tag, all_volumes, flat=True)
+        # all_centroids = np.array([self.mtu.get_average_position([v]) for v in all_volumes])
+        # for i, v in enumerate(all_volumes):
+        #     self.mb.tag_set_data(self.cent_tag, v, all_centroids[i])
+        all_centroids = self.all_centroids
+        all_fw = self.mb.tag_get_data(self.fw_tag, all_volumes, flat=True)
+        all_sats = self.mb.tag_get_data(self.sat_tag, all_volumes, flat=True)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, all_volumes, flat=True)
+
+        all_kharm = self.mb.tag_get_data(self.kharm_tag, all_faces_in, flat=True)
+
+        all_mobi_in_faces = np.zeros(len(all_faces_in))
+        all_s_gravs = all_mobi_in_faces.copy()
+        all_fw_in_face = all_mobi_in_faces.copy()
+        all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        self.Adjs = Adjs
+
+        for i, face in enumerate(all_faces_in):
+            elems = Adjs[i]
+            kharm = all_kharm[i]
+            id0 = map_volumes[elems[0]]
+            id1 = map_volumes[elems[1]]
+            lbt0 = all_lbt[id0]
+            lbt1 = all_lbt[id1]
+            fw0 = all_fw[id0]
+            fw1 = all_fw[id1]
+            sat0 = all_sats[id0]
+            sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
+            if abs(sat0-sat1) < lim:
+                all_dfds[i] = 0.0
+            else:
+                all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
+            if elems[0] in self.wells_injector:
+                all_mobi_in_faces[i] = kharm*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+            elif elems[1] in self.wells_injector:
+                all_mobi_in_faces[i] = kharm*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+            else:
+                all_mobi_in_faces[i] = kharm*(lbt0 + lbt1)/2.0
+                all_fw_in_face[i] = (fw0 + fw1)/2.0
+                gamaf = (gama0 + gama1)/2.0
             # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
             all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
             all_gamaf[i] = gamaf
@@ -673,7 +738,7 @@ class bifasico:
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
-    def set_mobi_faces(self, volumes, faces, finos0=None):
+    def set_mobi_faces_dep2(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -762,6 +827,95 @@ class bifasico:
                 gamaf = gama1
 
             all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
+
+        self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_mobi_in_faces)
+        self.mb.tag_set_data(self.s_grav_tag, faces, all_s_gravs)
+        self.mb.tag_set_data(self.fw_in_faces_tag, faces, all_fw_in_face)
+        self.mb.tag_set_data(self.dfds_tag, faces, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, faces, all_gamaf)
+
+    def set_mobi_faces(self, volumes, faces, finos0=None):
+
+        lim = 1e-5
+
+        """
+        seta a mobilidade nas faces uma vez calculada a pressao corrigida
+        """
+        # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        lim_sat = 0.15
+        # finos = self.mb.create_meshset()
+        # self.mb.tag_set_data(self.finos_tag, 0, finos)
+        # if finos0 == None:
+        #     self.mb.add_entities(finos, self.wells_injector)
+        #     self.mb.add_entities(finos, self.wells_producer)
+        # else:
+        #     self.mb.add_entities(finos, finos0)
+
+        map_volumes = dict(zip(volumes, range(len(volumes))))
+        all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
+        all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
+        all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
+        # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
+        all_centroids = self.all_centroids
+        all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
+
+        all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
+        all_kharm = self.mb.tag_get_data(self.kharm_tag, faces, flat=True)
+        # all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
+        all_mobi_in_faces = np.zeros(len(faces))
+        all_s_gravs = all_mobi_in_faces.copy()
+        all_fw_in_face = all_mobi_in_faces.copy()
+        all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
+        # Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
+        Adjs = self.Adjs
+
+        for i, face in enumerate(faces):
+            # elems = self.mb.get_adjacencies(face, 3)
+            elems = Adjs[i]
+            kharm = all_kharm[i]
+            id0 = map_volumes[elems[0]]
+            id1 = map_volumes[elems[1]]
+            lbt0 = all_lbt[id0]
+            lbt1 = all_lbt[id1]
+            fw0 = all_fws[id0]
+            fw1 = all_fws[id1]
+            sat0 = all_sats[id0]
+            sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
+            if abs(sat0 - sat1) < lim:
+                all_dfds[i] = 0.0
+            else:
+                all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
+            # if abs(sat0 - sat1) > lim_sat:
+            #     self.mb.add_entities(finos, elems)
+
+            flux_in_face = all_flux_in_faces[i]
+            if elems[0] in self.wells_injector:
+                all_mobi_in_faces[i] = kharm*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+                # continue
+            elif elems[1] in self.wells_injector:
+                all_mobi_in_faces[i] = kharm*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+                continue
+            elif flux_in_face < 0:
+                all_mobi_in_faces[i] = kharm*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+            else:
+                all_mobi_in_faces[i] = kharm*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+
             # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
             all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
             all_gamaf[i] = gamaf
@@ -1018,11 +1172,11 @@ class bifasico:
         lim = 1e-4
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
 
-        inds = np.where(all_qw<0)[0]
-        volumes_inds = rng.Range(np.array(volumes)[inds])
-        volumes_inds = rng.subtract(volumes_inds, self.wells_injector)
-        tag_ident1 = self.mb.tag_get_handle('identificador1', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
-        self.mb.tag_set_data(tag_ident1, volumes_inds, np.repeat(1, len(volumes_inds)))
+        # inds = np.where(all_qw<0)[0]
+        # volumes_inds = rng.Range(np.array(volumes)[inds])
+        # volumes_inds = rng.subtract(volumes_inds, self.wells_injector)
+        # tag_ident1 = self.mb.tag_get_handle('identificador1', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+        # self.mb.tag_set_data(tag_ident1, volumes_inds, np.repeat(1, len(volumes_inds)))
 
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)

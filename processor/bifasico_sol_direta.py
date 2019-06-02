@@ -50,6 +50,7 @@ class sol_direta_bif:
         self.lamb_o_tag = mb.tag_get_handle('LAMB_O')
         self.lbt_tag = mb.tag_get_handle('LBT')
         self.keq_tag = mb.tag_get_handle('K_EQ')
+        self.kharm_tag = mb.tag_get_handle('KHARM')
         self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES')
         self.fw_in_faces_tag = mb.tag_get_handle('FW_IN_FACES')
         self.phi_tag = mb.tag_get_handle('PHI')
