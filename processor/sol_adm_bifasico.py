@@ -27,6 +27,7 @@ class sol_adm_bifasico:
         self.arestas=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([2]))
         self.vertices=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([3]))
         self.wirebasket_elems = list(self.internos) + list(self.faces) + list(self.arestas) + list(self.vertices)
+        self.kdif_tag = mb.tag_get_handle('KDIF')
 
         self.ni=len(self.internos)
         self.nf=len(self.faces)
@@ -458,12 +459,53 @@ class sol_adm_bifasico:
 
         return As, s_grav
 
-    def get_AS_structured_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
+    def get_AS_structured_v2_dep0(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
         print('get As')
 
         all_s_gravs = mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)
         s_grav = np.zeros(len(all_volumes))
         all_mobis = mb.tag_get_data(mobi_tag, faces_in, flat=True)
+
+        lines_tf = []
+        cols_tf = []
+        data_tf = []
+
+        print("def As")
+        ty=time.time()
+        for i, f in enumerate(faces_in):
+            keq = all_mobis[i]
+            adjs = mb.get_adjacencies(f, 3)
+            Gid_1 = map_volumes[adjs[0]]
+            Gid_2 = map_volumes[adjs[1]]
+
+            lines_tf += [Gid_1, Gid_2]
+            cols_tf += [Gid_2, Gid_1]
+            data_tf += [keq, keq]
+
+            flux_grav = -all_s_gravs[i]
+            s_grav[Gid_1] += flux_grav
+            s_grav[Gid_2] -= flux_grav
+
+        if self.gravity == False:
+            s_grav = np.zeros(len(all_volumes))
+
+        print("took: ",time.time()-ty)
+        n = len(all_volumes)
+        Tf = csc_matrix((data_tf,(lines_tf,cols_tf)),shape=(n, n))
+        Tf = Tf.tolil()
+        d1 = np.array(Tf.sum(axis=1)).reshape(1, n)[0]*(-1)
+        Tf.setdiag(d1)
+
+        As = oth.get_Tmod_by_sparse_wirebasket_matrix(Tf, self.wirebasket_numbers)
+        As['Tf'] = Tf
+        return As, s_grav
+
+    def get_AS_structured_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
+        print('get As')
+
+        all_s_gravs = mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)
+        s_grav = np.zeros(len(all_volumes))
+        all_mobis = mb.tag_get_data(self.kdif_tag, faces_in, flat=True)
 
         lines_tf = []
         cols_tf = []

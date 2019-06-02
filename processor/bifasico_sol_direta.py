@@ -23,39 +23,26 @@ import importlib.machinery
 
 class sol_direta_bif:
 
-    def __init__(self, mb, mtu, all_volumes, data_loaded):
-        # self.k_pe_m = conv.pe_to_m(1.0)
-        self.k_pe_m = 1.0
-        self.k2 = 0.9
+    def __init__(self, mb, mtu, all_volumes):
+        self.k2 = 0.5
         self.cfl_ini = self.k2
         self.cfl = self.k2
         self.delta_t_min = 1000000
         self.perm_tag = mb.tag_get_handle('PERM')
         # self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
-        self.mi_w = float(data_loaded['dados_bifasico']['mi_w'])
         # self.mi_o = mb.tag_get_data(mb.tag_get_handle('MI_O'), 0, flat=True)[0]
-        self.mi_o = float(data_loaded['dados_bifasico']['mi_o'])
         # self.gama_w = mb.tag_get_data(mb.tag_get_handle('GAMA_W'), 0, flat=True)[0]
-        self.gama_w = float(data_loaded['dados_bifasico']['gama_w'])
         # self.gama_o = mb.tag_get_data(mb.tag_get_handle('GAMA_O'), 0, flat=True)[0]
-        self.gama_o = float(data_loaded['dados_bifasico']['gama_o'])
         # self.Sor = mb.tag_get_data(mb.tag_get_handle('SOR'), 0, flat=True)[0]
-        self.Sor = float(data_loaded['dados_bifasico']['Sor'])
         # self.Swc = mb.tag_get_data(mb.tag_get_handle('SWC'), 0, flat=True)[0]
-        self.Swc = float(data_loaded['dados_bifasico']['Swc'])
         # self.nw = mb.tag_get_data(mb.tag_get_handle('NW'), 0, flat=True)[0]
-        self.nw = float(data_loaded['dados_bifasico']['nwater'])
         # self.no = mb.tag_get_data(mb.tag_get_handle('NO'), 0, flat=True)[0]
-        self.no = float(data_loaded['dados_bifasico']['noil'])
         # self.tz = mb.tag_get_data(mb.tag_get_handle('TZ'), 0, flat=True)[0]
         # self.loops = mb.tag_get_data(mb.tag_get_handle('LOOPS'), 0, flat=True)[0]
-        self.loops = int(data_loaded['dados_bifasico']['loops'])
         # self.total_time = mb.tag_get_data(mb.tag_get_handle('TOTAL_TIME'), 0, flat=True)[0]
-        self.total_time = float(data_loaded['dados_bifasico']['total_time'])
         # self.gravity = mb.tag_get_data(mb.tag_get_handle('GRAVITY'), 0, flat=True)[0]
-        self.gravity = data_loaded['gravity']
-        self.volume_tag = mb.tag_get_handle('VOLUME', 1,  types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        self.sat_tag = mb.tag_get_handle('SAT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.volume_tag = mb.tag_get_handle('VOLUME')
+        self.sat_tag = mb.tag_get_handle('SAT')
         self.sat_last_tag = mb.tag_get_handle('SAT_LAST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.sat_last_tag = mb.tag_get_handle('SAT_LAST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.fw_tag = mb.tag_get_handle('FW', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
@@ -91,7 +78,7 @@ class sol_direta_bif:
         mb.tag_set_data(self.ids_volumes_tag, all_volumes, np.arange(len(all_volumes)))
         self.mb = mb
         self.mtu = mtu
-        self.gama = self.gama_w + self.gama_o
+        # self.gama = self.gama_w + self.gama_o
         phis =  mb.tag_get_data(self.phi_tag, all_volumes, flat=True)
         bb = np.nonzero(phis)[0]
         phis = phis[bb]
@@ -386,6 +373,7 @@ class sol_direta_bif:
         delta_sat = 0.001
         t1 = time.time()
         lim = 1e-10
+        lim_qw = 9e-8
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
@@ -405,46 +393,25 @@ class sol_direta_bif:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
+            if qw < 0 and abs(qw) < lim_qw:
+                qw = 0.0
 
             # if abs(qw) < lim:
             #     sats_2[i] = sat1
             #     continue
-            if qw < -lim:
-                print('abs(qw) > lim')
-                print(qw)
-                print('i')
-                print(i)
-                print('loop')
-                print(loop)
-                print('\n')
-                tag_test = self.mb.tag_get_handle('TAG_TEST', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-                vi = volumes[i]
-                adjsi = self.mtu.get_bridge_adjacencies(vi, 2, 3)
-                facesi = self.mtu.get_bridge_adjacencies(vi, 3, 2)
-                faces_adjs = self.mtu.get_bridge_adjacencies(adjsi, 3, 2)
-                facesinter = rng.intersect(facesi, faces_adjs)
-                pi = self.mb.tag_get_data(self.pf_tag, vi, flat=True)
-                padjs = self.mb.tag_get_data(self.pf_tag, adjsi, flat=True)
-                self.mb.tag_set_data(tag_test, adjsi, padjs)
-                self.mb.tag_set_data(tag_test, vi, pi)
-                keqs = self.mb.tag_get_data(self.mobi_in_faces_tag, facesinter, flat=True)
-                fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, facesinter, flat=True)
-                idsadjs = [self.map_volumes[v] for v in adjsi]
-                lladj = np.array([np.array(self.mb.get_adjacencies(f, 3)) for f in facesinter])
-                ll0 = lladj[:,0]
-                ll1 = lladj[:,1]
-                ps0 = self.mb.tag_get_data(self.pf_tag, np.array(ll0), flat=True)
-                ps1 = self.mb.tag_get_data(self.pf_tag, np.array(ll1), flat=True)
+            # if qw < -lim:
+            #     print('abs(qw) > lim')
+            #     print(qw)
+            #     print('i')
+            #     print(i)
+            #     print('loop')
+            #     print(loop)
+            #     print('\n')
+            #     import pdb; pdb.set_trace()
+            #     return 1
 
-                cc = self.mb.create_meshset()
-                self.mb.add_entities(cc, volumes)
-                self.mb.write_file('testt.vtk', [cc])
-
-                import pdb; pdb.set_trace()
-                return 1
-
-            else:
-                pass
+            # else:
+            #     pass
 
             fi = all_fis[i]
             if fi == 0.0:
@@ -462,10 +429,12 @@ class sol_direta_bif:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
-                sat = 0.8
+            if sat > (1-self.Sor) - delta_sat and sat < ((1-self.Sor)) + delta_sat:
+                sat = 1-self.Sor
+            elif sat > self.Swc - delta_sat and sat < self.Swc + delta_sat:
+                sat = self.Swc
 
-            elif sat > 0.8:
+            elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
                 print("Sat > 0.8")
                 print(sat)
@@ -484,6 +453,11 @@ class sol_direta_bif:
             #     print(f'sat: {sat}')
             #     print(f'sat1: {sat1}\n')
             #     return 1
+
+            elif sat < self.Swc:
+                pdb.set_trace()
+                print('erro2')
+                pass
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:
@@ -661,7 +635,7 @@ class sol_direta_bif:
         # self.vpi += vpi
         return cfl
 
-    def get_hist(self, t, dt):
+    def get_hist(self, t, dt, loop):
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
 
@@ -673,9 +647,8 @@ class sol_direta_bif:
 
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
-        historico = np.load('historico.npy')
-        historico = np.append(historico, hist)
-        np.save('historico', historico)
+        name = 'historico_' + str(loop)
+        np.save(name, hist)
 
     def pol_interp(self, S):
         # S_temp = (S - self.Swc)/(1 - self.Swc - self.Sor)

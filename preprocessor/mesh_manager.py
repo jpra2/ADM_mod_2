@@ -45,6 +45,8 @@ class MeshManager:
             "Global_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_DENSE, True)'''
 
         self.create_tags()
+        self.mb.tag_set_data(self.ids_volumes_tag, self.all_volumes, np.arange(len(self.all_volumes)))
+        self.mb.tag_set_data(self.ids_faces_tag, self.all_faces, np.arange(len(self.all_faces)))
         self.set_k()
         self.set_phi()
         # self.set_k_and_phi_structured_spe10()
@@ -81,7 +83,8 @@ class MeshManager:
         self.mpfa_tag = self.mb.tag_get_handle('MPFA', 1, types.MB_TYPE_BIT, types.MB_TAG_SPARSE, True)
         self.mi_tag = self.mb.tag_get_handle('MI', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.tz_tag = self.mb.tag_get_handle('TZ', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
+        self.ids_volumes_tag = self.mb.tag_get_handle('IDS_VOLUMES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+        self.ids_faces_tag = self.mb.tag_get_handle('IDS_FACES', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
 
         #deleteme
         self.wells_dirichlet_tag = self.mb.tag_get_handle("WELLS_D", 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)

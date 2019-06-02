@@ -9,6 +9,7 @@ import time
 from processor import conversao as conv
 from utils.others_utils import OtherUtils as oth
 import pdb
+#
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -38,11 +39,7 @@ import importlib.machinery
 
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
-
-        # self.k_pe_m = conv.pe_to_m(1.0)
-        self.k_pe_m = 1.0
-
-        self.cfl_ini = 0.9
+        self.cfl_ini = 0.5
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
         # self.mi_w = mb.tag_get_data(mb.tag_get_handle('MI_W'), 0, flat=True)[0]
@@ -80,7 +77,7 @@ class bifasico:
         self.lamb_o_tag = mb.tag_get_handle('LAMB_O', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         # self.lbt_tag = mb.tag_get_handle('LBT')
         self.lbt_tag = mb.tag_get_handle('LBT', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-        self.keq_tag = mb.tag_get_handle('K_EQ')
+        self.k_eq_tag = mb.tag_get_handle('K_EQ')
         # self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES')
         self.mobi_in_faces_tag = mb.tag_get_handle('MOBI_IN_FACES', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         # self.fw_in_faces_tag = mb.tag_get_handle('FW_IN_FACES')
@@ -96,6 +93,7 @@ class bifasico:
         self.wells_injector = mb.get_entities_by_handle(self.wells_injector[0])
         self.wells_producer = mb.tag_get_data(mb.tag_get_handle('WELLS_PRODUCER'), 0, flat=True)
         self.wells_producer = mb.get_entities_by_handle(self.wells_producer[0])
+        self.kdif_tag = mb.tag_get_handle('KDIF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         # self.s_grav_tag = mb.tag_get_handle('S_GRAV')
         self.s_grav_tag = mb.tag_get_handle('S_GRAV', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         self.cent_tag = mb.tag_get_handle('CENT')
@@ -134,6 +132,8 @@ class bifasico:
         self.V_total = mb.tag_get_data(self.volume_tag, all_volumes, flat=True)
         self.V_total = float((self.V_total*mb.tag_get_data(self.phi_tag, all_volumes, flat=True)).sum())
         self.vpi = 0.0
+        d1_tag = self.mb.tag_get_handle('d1')
+        self.vertices = set(self.mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([d1_tag]), np.array([3])))
 
     def calc_cfl_dep0(self, all_faces_in):
         """
@@ -421,7 +421,7 @@ class bifasico:
         self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
 
-    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+    def set_mobi_faces_ini_dep1(self, all_volumes, all_faces_in):
         lim = 1e-5
 
         map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
@@ -443,6 +443,7 @@ class bifasico:
         all_dfds = all_mobi_in_faces.copy()
         all_gamaf = all_mobi_in_faces.copy()
         Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        self.Adjs = Adjs
 
         for i, face in enumerate(all_faces_in):
             elems = Adjs[i]
@@ -481,9 +482,9 @@ class bifasico:
                 all_fw_in_face[i] = fw1
                 gamaf = gama1
             else:
-                # all_mobi_in_faces[i] = ((k0 + k1)/2.0)*(lbt0 + lbt1)/2.0
                 all_mobi_in_faces[i] = ((2*k0*k1)/(k0+k1))*(lbt0 + lbt1)/2.0
-                all_fw_in_face[i] = (fw0 + fw1)/2.0
+                # all_fw_in_face[i] = (fw0 + fw1)/2.0
+                all_fw_in_face[i] = 0.0
                 gamaf = (gama0 + gama1)/2.0
             all_mobi_in_faces[i] *= area/h
             # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
@@ -496,6 +497,82 @@ class bifasico:
         self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
         self.mb.tag_set_data(self.gamaf_tag, all_faces_in, all_gamaf)
 
+    def set_mobi_faces_ini(self, all_volumes, all_faces_in):
+        lim = 1e-5
+
+        map_volumes = dict(zip(all_volumes, range(len(all_volumes))))
+
+        all_lbt = self.mb.tag_get_data(self.lbt_tag, all_volumes, flat=True)
+        # all_centroids = np.array([self.mtu.get_average_position([v]) for v in all_volumes])
+        # for i, v in enumerate(all_volumes):
+        #     self.mb.tag_set_data(self.cent_tag, v, all_centroids[i])
+        all_centroids = self.all_centroids
+        all_fw = self.mb.tag_get_data(self.fw_tag, all_volumes, flat=True)
+        all_sats = self.mb.tag_get_data(self.sat_tag, all_volumes, flat=True)
+        all_ks = self.mb.tag_get_data(self.perm_tag, all_volumes)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, all_volumes, flat=True)
+        all_kdif = self.mb.tag_get_data(self.k_eq_tag, all_faces_in, flat=True)
+
+        all_mobi_in_faces = np.zeros(len(all_faces_in))
+        all_s_gravs = all_mobi_in_faces.copy()
+        all_fw_in_face = all_mobi_in_faces.copy()
+        all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        self.Adjs = Adjs
+
+        for i, face in enumerate(all_faces_in):
+            elems = Adjs[i]
+            id0 = map_volumes[elems[0]]
+            id1 = map_volumes[elems[1]]
+            lbt0 = all_lbt[id0]
+            lbt1 = all_lbt[id1]
+            fw0 = all_fw[id0]
+            fw1 = all_fw[id1]
+            sat0 = all_sats[id0]
+            sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
+            k0 = all_ks[id0].reshape([3,3])
+            k1 = all_ks[id1].reshape([3,3])
+            direction = all_centroids[id1] - all_centroids[id0]
+            norma = np.linalg.norm(direction)
+            uni = np.absolute(direction/norma)
+            k0 = np.dot(np.dot(k0, uni), uni)
+            k1 = np.dot(np.dot(k1, uni), uni)
+            h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
+            if abs(sat0-sat1) < lim:
+                all_dfds[i] = 0.0
+            else:
+                all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
+            if elems[0] in self.wells_injector:
+                all_mobi_in_faces[i] = k0*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+            elif elems[1] in self.wells_injector:
+                all_mobi_in_faces[i] = k1*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+            else:
+                all_mobi_in_faces[i] = ((2*k0*k1)/(k0+k1))*(lbt0 + lbt1)/2.0
+                # all_fw_in_face[i] = (fw0 + fw1)/2.0
+                all_fw_in_face[i] = 0.0
+                gamaf = (gama0 + gama1)/2.0
+            all_mobi_in_faces[i] *= area/h
+            all_kdif[i] = all_kdif[i]*((lbt0 + lbt1)/2)
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
+
+        # self.mb.tag_set_data(self.mobi_in_faces_tag, all_faces_in, all_mobi_in_faces)
+        self.mb.tag_set_data(self.mobi_in_faces_tag, all_faces_in, all_kdif)
+        self.mb.tag_set_data(self.s_grav_tag, all_faces_in, all_s_gravs)
+        self.mb.tag_set_data(self.fw_in_faces_tag, all_faces_in, all_fw_in_face)
+        self.mb.tag_set_data(self.dfds_tag, all_faces_in, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, all_faces_in, all_gamaf)
+        self.mb.tag_set_data(self.kdif_tag, all_faces_in, all_kdif)
 
     def set_mobi_faces_dep0(self, volumes, faces, finos0=None):
 
@@ -572,7 +649,7 @@ class bifasico:
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
-    def set_mobi_faces(self, volumes, faces, finos0=None):
+    def set_mobi_faces_dep1(self, volumes, faces, finos0=None):
 
         lim = 1e-5
 
@@ -673,6 +750,228 @@ class bifasico:
         # vols_finos = self.mb.get_entities_by_handle(finos)
         # self.mb.tag_set_data(finos_val, vols_finos, np.repeat(1.0, len(vols_finos)))
 
+    def set_mobi_faces_dep2(self, volumes, faces, finos0=None):
+
+        lim = 1e-5
+
+        """
+        seta a mobilidade nas faces uma vez calculada a pressao corrigida
+        """
+        # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        lim_sat = 0.15
+        # finos = self.mb.create_meshset()
+        # self.mb.tag_set_data(self.finos_tag, 0, finos)
+        # if finos0 == None:
+        #     self.mb.add_entities(finos, self.wells_injector)
+        #     self.mb.add_entities(finos, self.wells_producer)
+        # else:
+        #     self.mb.add_entities(finos, finos0)
+
+        map_volumes = dict(zip(volumes, range(len(volumes))))
+        all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
+        all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
+        all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
+        # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
+        all_centroids = self.all_centroids
+        all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
+
+        all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
+        # all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
+        all_mobi_in_faces = np.zeros(len(faces))
+        all_s_gravs = all_mobi_in_faces.copy()
+        all_fw_in_face = all_mobi_in_faces.copy()
+        all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
+
+        for i, face in enumerate(faces):
+            # elems = self.mb.get_adjacencies(face, 3)
+            elems = Adjs[i]
+            # lbt0 = self.mb.tag_get_data(self.lbt_tag, elems[0], flat=True)[0]
+            # lbt1 = self.mb.tag_get_data(self.lbt_tag, elems[1], flat=True)[0]
+            id0 = map_volumes[elems[0]]
+            id1 = map_volumes[elems[1]]
+            lbt0 = all_lbt[id0]
+            lbt1 = all_lbt[id1]
+            fw0 = all_fws[id0]
+            fw1 = all_fws[id1]
+            sat0 = all_sats[id0]
+            sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
+            k0 = all_ks[id0].reshape([3,3])
+            k1 = all_ks[id1].reshape([3,3])
+            direction = all_centroids[id1] - all_centroids[id0]
+            norma = np.linalg.norm(direction)
+            uni = np.absolute(direction/norma)
+            k0 = np.dot(np.dot(k0, uni), uni)
+            k1 = np.dot(np.dot(k1, uni), uni)
+            h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
+
+            if abs(sat0 - sat1) < lim:
+                all_dfds[i] = 0.0
+            else:
+                all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
+            # if abs(sat0 - sat1) > lim_sat:
+            #     self.mb.add_entities(finos, elems)
+
+            flux_in_face = all_flux_in_faces[i]
+            if elems[0] in self.wells_injector:
+                all_mobi_in_faces[i] = k0*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+                # continue
+            elif elems[1] in self.wells_injector:
+                all_mobi_in_faces[i] = k1*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+                continue
+            elif flux_in_face < 0:
+                all_mobi_in_faces[i] = k0*(lbt0)
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+            else:
+                all_mobi_in_faces[i] = k1*(lbt1)
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+
+            all_mobi_in_faces[i] *= area/h
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
+
+        self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_mobi_in_faces)
+        self.mb.tag_set_data(self.s_grav_tag, faces, all_s_gravs)
+        self.mb.tag_set_data(self.fw_in_faces_tag, faces, all_fw_in_face)
+        self.mb.tag_set_data(self.dfds_tag, faces, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, faces, all_gamaf)
+
+    def set_mobi_faces(self, volumes, faces, finos0=None):
+
+        lim = 1e-5
+
+        """
+        seta a mobilidade nas faces uma vez calculada a pressao corrigida
+        """
+        # finos_val = self.mb.tag_get_handle('FINOS_VAL', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        lim_sat = 0.15
+        # finos = self.mb.create_meshset()
+        # self.mb.tag_set_data(self.finos_tag, 0, finos)
+        # if finos0 == None:
+        #     self.mb.add_entities(finos, self.wells_injector)
+        #     self.mb.add_entities(finos, self.wells_producer)
+        # else:
+        #     self.mb.add_entities(finos, finos0)
+        all_faces_in = faces
+
+        map_volumes = dict(zip(volumes, range(len(volumes))))
+        all_lbt = self.mb.tag_get_data(self.lbt_tag, volumes, flat=True)
+        all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
+        all_fws = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
+        all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
+        # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
+        all_centroids = self.all_centroids
+        all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
+        all_kdif = self.mb.tag_get_data(self.k_eq_tag, all_faces_in, flat=True)
+
+        all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
+        # all_keqs = self.mb.tag_get_data(self.keq_tag, faces, flat=True)
+        all_mobi_in_faces = np.zeros(len(faces))
+        all_s_gravs = all_mobi_in_faces.copy()
+        all_fw_in_face = all_mobi_in_faces.copy()
+        all_dfds = all_mobi_in_faces.copy()
+        all_gamaf = all_mobi_in_faces.copy()
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
+
+        for i, face in enumerate(faces):
+            # elems = self.mb.get_adjacencies(face, 3)
+            elems = Adjs[i]
+            # lbt0 = self.mb.tag_get_data(self.lbt_tag, elems[0], flat=True)[0]
+            # lbt1 = self.mb.tag_get_data(self.lbt_tag, elems[1], flat=True)[0]
+            id0 = map_volumes[elems[0]]
+            id1 = map_volumes[elems[1]]
+            lbt0 = all_lbt[id0]
+            lbt1 = all_lbt[id1]
+            fw0 = all_fws[id0]
+            fw1 = all_fws[id1]
+            sat0 = all_sats[id0]
+            sat1 = all_sats[id1]
+            gama0 = all_gamav[id0]
+            gama1 = all_gamav[id1]
+
+            k0 = all_ks[id0].reshape([3,3])
+            k1 = all_ks[id1].reshape([3,3])
+            direction = all_centroids[id1] - all_centroids[id0]
+            norma = np.linalg.norm(direction)
+            uni = np.absolute(direction/norma)
+            k0 = np.dot(np.dot(k0, uni), uni)
+            k1 = np.dot(np.dot(k1, uni), uni)
+            h = np.dot(self.hs, uni)
+            area = np.dot(self.Areas, uni)
+
+            if abs(sat0 - sat1) < lim:
+                all_dfds[i] = 0.0
+            else:
+                all_dfds[i] = abs((fw0 - fw1)/(sat0 - sat1))
+            # if abs(sat0 - sat1) > lim_sat:
+            #     self.mb.add_entities(finos, elems)
+
+            flux_in_face = all_flux_in_faces[i]
+            if elems[0] in self.wells_injector:
+                all_mobi_in_faces[i] = k0*lbt0
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+                # continue
+            elif elems[1] in self.wells_injector:
+                all_mobi_in_faces[i] = k1*lbt1
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+                continue
+            elif flux_in_face < 0:
+                all_mobi_in_faces[i] = k0*(lbt0)
+                all_fw_in_face[i] = fw0
+                gamaf = gama0
+            else:
+                all_mobi_in_faces[i] = k1*(lbt1)
+                all_fw_in_face[i] = fw1
+                gamaf = gama1
+
+            all_mobi_in_faces[i] *= area/h
+            all_kdif[i] = all_kdif[i]*((lbt0 + lbt1)/2)
+            # all_s_gravs[i] = self.gama*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_s_gravs[i] = gamaf*all_mobi_in_faces[i]*(all_centroids[id1][2] - all_centroids[id0][2])
+            all_gamaf[i] = gamaf
+
+        # self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_mobi_in_faces)
+        self.mb.tag_set_data(self.mobi_in_faces_tag, faces, all_kdif)
+        self.mb.tag_set_data(self.s_grav_tag, faces, all_s_gravs)
+        self.mb.tag_set_data(self.fw_in_faces_tag, faces, all_fw_in_face)
+        self.mb.tag_set_data(self.dfds_tag, faces, all_dfds)
+        self.mb.tag_set_data(self.gamaf_tag, faces, all_gamaf)
+        self.mb.tag_set_data(self.kdif_tag, all_faces_in, all_kdif)
+
+    def set_finos(self, finos0, meshsets_nv1):
+        lim_sat = 0.1
+
+        finos = self.mb.create_meshset()
+        self.mb.tag_set_data(self.finos_tag, 0, finos)
+        if finos0 == None:
+            self.mb.add_entities(finos, self.wells_injector)
+            self.mb.add_entities(finos, self.wells_producer)
+        else:
+            self.mb.add_entities(finos, finos0)
+
+        for m in meshsets_nv1:
+            elems = self.mb.get_entities_by_handle(m)
+            sats = self.mb.tag_get_data(self.sat_tag, elems, flat=True)
+            min_sat = sats.min()
+            max_sat = sats.max()
+            if max_sat - min_sat > lim_sat:
+                self.mb.add_entities(finos, elems)
+
     def set_flux_pms_meshsets_dep0(self, volumes, faces, faces_boundary, pms_tag, pcorr_tag, pcorr2_tag=None):
 
         map_local = dict(zip(volumes, range(len(volumes))))
@@ -738,7 +1037,8 @@ class bifasico:
           map_pms_vols3 = dict(zip(vols3, pms_vols3))
           del pms_vols3
 
-          mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        #   mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+          mobi_in_faces = self.mb.tag_get_data(self.kdif_tag, faces, flat=True)
           fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
           if self.gravity:
               s_gravs_faces = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
@@ -841,7 +1141,8 @@ class bifasico:
 
     def set_flux_pms_elems_nv0(self, volumes, faces, pms_tag):
 
-        mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        # mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        mobi_in_faces = self.mb.tag_get_data(self.kdif_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
         if self.gravity:
             s_gravs_faces = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
@@ -871,7 +1172,18 @@ class bifasico:
             fluxos_w[id1] -= flux*fw
             flux_in_faces[i] = flux
 
-        ids_volumes = [map_local[v] for v in volumes]
+        # pdb.set_trace()
+        # tt = np.where(fluxos_w < 0)[0]
+        # vols_tt = np.array(volumes_2)[tt]
+        # vols_injector = np.array(self.wells_injector)
+        # vols_producer = np.array(self.wells_producer)
+        # map_vols_injector = [map_local[v] for v in vols_injector]
+        # fl_injector = fluxos_w[map_vols_injector]
+        # ff = np.setdiff1d(vols_tt, vols_injector)
+        # pdb.set_trace()
+
+        # ids_volumes = [map_local[v] for v in volumes]
+        ids_volumes = list((map_local[v] for v in volumes))
         fluxos = fluxos[ids_volumes]
         fluxos_w = fluxos_w[ids_volumes]
 
@@ -884,15 +1196,26 @@ class bifasico:
         calcula a saturacao do passo de tempo corrente
         """
         delta_sat = 0.001
+        lim_qw = 9e-8
         t1 = time.time()
         lim = 1e-4
         all_qw = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
+
+        inds = np.where(all_qw<0)[0]
+        volumes_inds = rng.Range(np.array(volumes)[inds])
+        volumes_inds = rng.subtract(volumes_inds, self.wells_injector)
+        tag_ident1 = self.mb.tag_get_handle('identificador1', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
+        self.mb.tag_set_data(tag_ident1, volumes_inds, np.repeat(1, len(volumes_inds)))
+
         all_fis = self.mb.tag_get_data(self.phi_tag, volumes, flat=True)
         all_sats = self.mb.tag_get_data(self.sat_tag, volumes, flat=True)
         all_volumes = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
         all_fw = self.mb.tag_get_data(self.fw_tag, volumes, flat=True)
         all_total_flux = self.mb.tag_get_data(self.total_flux_tag, volumes, flat=True)
         # all_Vs = self.mb.tag_get_data(self.volume_tag, volumes, flat=True)
+        # vv = self.mb.create_meshset()
+        # self.mb.add_entities(vv, volumes)
+        # self.mb.write_file('testtt.vtk', [vv])
 
         sats_2 = np.zeros(len(volumes))
 
@@ -900,25 +1223,27 @@ class bifasico:
             # gid = mb.tag_get_data(self.global_id_tag, volume, flat=True)[0]
             sat1 = all_sats[i]
             V = all_volumes[i]
-            if volume in self.wells_injector or sat1 == 0.8:
+            if volume in self.wells_injector or sat1 == 1-self.Sor:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
+            if qw < 0 and abs(qw) < lim_qw:
+                qw = 0.0
 
             # if abs(qw) < lim:
             #     sats_2[i] = sat1
             #     continue
-            if qw < 0.0:
-                print('qw < 0')
-                print(qw)
-                print('i')
-                print(i)
-                print('loop')
-                print(loop)
-                print('\n')
-                return True
-            else:
-                pass
+            # if qw < 0.0:
+            #     print('qw < 0')
+            #     print(qw)
+            #     print('i')
+            #     print(i)
+            #     print('loop')
+            #     print(loop)
+            #     print('\n')
+            #     return True
+            # else:
+            #     pass
 
             # if self.loop > 1:
             #     import pdb; pdb.set_trace()
@@ -932,6 +1257,8 @@ class bifasico:
                 qw_out = flux*fw
             else:
                 qw_out = 0.0
+                fw = None
+                flux = None
 
             sat = sat1 + (qw - qw_out)*(self.delta_t/(fi*V))
             # sat = sat1 + qw*(self.delta_t/(self.fimin*self.Vmin))
@@ -939,10 +1266,12 @@ class bifasico:
             #     print('erro na saturacao')
             #     print('sat1 > sat')
             #     return True
-            if sat > 0.8 - delta_sat and sat < 0.8 + delta_sat:
-                sat = 0.8
+            if sat > (1-self.Sor) - delta_sat and sat < ((1-self.Sor)) + delta_sat:
+                sat = 1-self.Sor
+            elif sat > self.Swc - delta_sat and sat < self.Swc + delta_sat:
+                sat = self.Swc
 
-            elif sat > 0.8:
+            elif sat > 1-self.Sor:
                 #sat = 1 - self.Sor
                 print("Sat > 0.8")
                 print(sat)
@@ -954,6 +1283,16 @@ class bifasico:
 
                 # sat = 0.8
                 return True
+
+            elif sat < self.Swc:
+                vv = self.mb.create_meshset()
+                self.mb.add_entities(vv, volumes)
+                self.mb.write_file('testtt.vtk', [vv])
+
+                pdb.set_trace()
+                print('erro2')
+                pass
+
 
             # elif sat > sat1 + 0.2:
             #     print('sat > sat1')
@@ -1193,7 +1532,7 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def calculate_pcorr(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
+    def calculate_pcorr_dep1(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
         """
         mb = core do pymoab
         elems_in_meshset = elementos dentro de um meshset
@@ -1270,6 +1609,98 @@ class bifasico:
         d_vols = rng.Range(vertice)
         map_values = dict(zip(d_vols, mb.tag_get_data(pms_tag, d_vols, flat=True)))
         T, b = oth.set_boundary_dirichlet_matrix(map_local, map_values, b, T)
+
+        x = oth.get_solution(T, b)
+        mb.tag_set_data(pcorr_tag, elems_in_meshset, x)
+        if pcorr2_tag == None:
+            pass
+        else:
+            mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
+
+    def calculate_pcorr(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
+        """
+        mb = core do pymoab
+        elems_in_meshset = elementos dentro de um meshset
+        vertice = elemento que é vértice do meshset
+        faces_boundary = faces do contorno do meshset
+        faces = todas as faces do meshset
+        pcorr_tag = tag da pressao corrigida
+        pms_tag = tag da pressao multiescala
+
+        """
+        if vertice not in self.vertices:
+            import pdb; pdb.set_trace()
+
+        allmobis = mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        allkdif = mb.tag_get_data(self.kdif_tag, faces, flat=True)
+        vols3 = self.mtu.get_bridge_adjacencies(faces_boundary, 2, 3)
+        vols_inter = rng.subtract(vols3, elems_in_meshset)
+        pms_vols3 = self.mb.tag_get_data(pms_tag, vols3, flat=True)
+        map_pms_vols3 = dict(zip(vols3, pms_vols3))
+        del pms_vols3
+
+        volumes_2 = self.mtu.get_bridge_adjacencies(elems_in_meshset, 2, 3)
+        if self.gravity:
+            s_gravs = mb.tag_get_data(self.s_grav_tag, faces, flat=True)
+        else:
+            s_gravs = np.zeros(len(faces))
+        n = len(elems_in_meshset)
+
+        map_local = dict(zip(elems_in_meshset, range(n)))
+        lines = []
+        cols = []
+        data = []
+        b = np.zeros(n)
+        Adjs = [self.mb.get_adjacencies(face, 3) for face in faces]
+        faces_in = rng.subtract(faces, faces_boundary)
+        map_id_faces = dict(zip(faces, range(len(faces))))
+
+        for face in faces_in:
+            id_face = map_id_faces[face]
+            mobi = allkdif[id_face]
+            s_g = -s_gravs[id_face]
+            elem0 = Adjs[id_face][0]
+            elem1 = Adjs[id_face][1]
+            id0 = map_local[elem0]
+            id1 = map_local[elem1]
+            b[id0] += s_g
+            b[id1] -= s_g
+            lines += [id0, id1]
+            cols += [id1, id0]
+            data += [mobi, mobi]
+
+        for face in faces_boundary:
+            id_face = map_id_faces[face]
+            mobi = allkdif[id_face]
+            s_g = -s_gravs[id_face]
+            elem0 = Adjs[id_face][0]
+            elem1 = Adjs[id_face][1]
+            vvv = True
+            try:
+                id = map_local[elem0]
+            except KeyError:
+                id = map_local[elem1]
+                vvv = False
+            flux = -(map_pms_vols3[elem1] - map_pms_vols3[elem0])*mobi + s_g
+            if vvv:
+                b[id] += flux
+            else:
+                b[id] -= flux
+
+        T = sp.csc_matrix((data,(lines,cols)),shape=(n, n))
+        T = T.tolil()
+        d1 = np.array(T.sum(axis=1)).reshape(1, n)[0]*(-1)
+        T.setdiag(d1)
+
+        level = np.unique(mb.tag_get_data(dict_tags['l3_ID'], elems_in_meshset, flat=True))
+
+        # d_vols = rng.Range(vertice)
+        d_vols = np.array([vertice])
+        # map_values = dict(zip(d_vols, mb.tag_get_data(pms_tag, d_vols, flat=True)))
+        # T, b = oth.set_boundary_dirichlet_matrix(map_local, map_values, b, T)
+        T[map_local[vertice]] = 0.0
+        T[map_local[vertice], map_local[vertice]] = 1.0
+        b[map_local[vertice]] = mb.tag_get_data(pms_tag, vertice, flat=True)[0]
 
         x = oth.get_solution(T, b)
         mb.tag_set_data(pcorr_tag, elems_in_meshset, x)
@@ -1602,7 +2033,7 @@ class bifasico:
         self.Tf2 = Tf.copy()
         self.b2 = b.copy()
 
-    def get_hist_ms(self, t, dt):
+    def get_hist_ms(self, t, dt, loop):
 
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
@@ -1614,9 +2045,8 @@ class bifasico:
         self.vpi += vpi
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
-        historico = np.load('historico.npy')
-        historico = np.append(historico, hist)
-        np.save('historico', historico)
+        name = 'historico_' + str(loop)
+        np.save(name, hist)
 
     def verificar_cfl(self, volumes, loop):
         t0 = time.time()

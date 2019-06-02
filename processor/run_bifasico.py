@@ -6,6 +6,7 @@ import scipy.sparse as sp
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
 import yaml
 import io
+import pdb
 import conversao as conv
 from utils import pymoab_utils as utpy
 from utils.others_utils import OtherUtils as oth
@@ -13,8 +14,7 @@ from utils import prolongation_ams as prol_tpfa
 from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
-from processor import def_intermediarios as def1
-import pdb
+from processor import def_intermediarios as definter
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -44,59 +44,48 @@ k_md_to_m2 = 1.0
 # prol_tpfa = loader.load_module('prol_tpfa')
 # loader = importlib.machinery.SourceFileLoader('malha_adm', parent_dir + '/malha_adm.py')
 # adm_mesh = loader.load_module('malha_adm')
-
-def1.create_names_tags()
-
+definter.create_names_tags()
 mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded = utpy.load_adm_mesh()
-all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+
 # tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
 tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 
-# k10 = [1.0, 0.0, 0.0,
-#        0.0, 1.0, 0.0,
-#        0.0, 0.0, 1.0]
-#
-# for v in all_volumes:
-#     mb.tag_set_data(tags_1['PERM'], v, np.array(k10))
-#
-# # mb.tag_set_data(tags_1['PERM'], all_volumes, np.repeat(k10, len(all_volumes)))
-# mb.tag_set_data(tags_1['K_EQ'], all_faces, np.repeat(1.0, len(all_faces)))
-
-########################################
-##alterar
-
-def1.def_inter(mb, tags_1)
-def1.injector_producer_press(mb)
-#######################################
+definter.def_inter(mb, tags_1)
 
 os.chdir(flying_dir)
 faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
 intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
-adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file)
+adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
+all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
-tags = [tags_1['l1_ID'], tags_1['l2_ID']]
-for tag in tags:
-    all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
-    minim = min(all_gids)
-    all_gids -= minim
-    mb.tag_set_data(tag, all_volumes, all_gids)
+definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
+# definter.injector_producer(mb)
+# tags = [tags_1['l1_ID'], tags_1['l2_ID']]
+# for tag in tags:
+#     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
+#     minim = min(all_gids)
+#     all_gids -= minim
+#     mb.tag_set_data(tag, all_volumes, all_gids)
+
 vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
-
-
-
+# loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
+# bif_utils = loader.load_module('bif_utils').bifasico(mb, mtu, all_volumes)
 bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
 bif_utils.k_pe_m = k_pe_m
 
 bif_utils.gravity = data_loaded['gravity']
+# from processor import posteriori
+# posteriori.redefinir_permeabilidades(mb, all_volumes, bif_utils.all_centroids, bif_utils.perm_tag)
 # loader = importlib.machinery.SourceFileLoader('sol_adm_bifasico', parent_dir + '/sol_adm_bifasico.py')
 # sol_adm_bif = loader.load_module('sol_adm_bifasico')
 
 oth.gravity = bif_utils.gravity
 oth1 = oth(mb, mtu)
 sol_adm = sol_adm_bif.sol_adm_bifasico(mb, tags_1, oth.gravity, all_volumes, data_loaded)
+
 all_ids_reord = mb.tag_get_data(tags_1['ID_reord_tag'], all_volumes, flat=True)
 map_global = dict(zip(all_volumes, all_ids_reord))
 boundary_faces = mb.tag_get_data(tags_1['FACES_BOUNDARY'], 0, flat=True)[0]
@@ -125,9 +114,9 @@ meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([t
 meshsets_nv2 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_2']]), np.array([None]))
 meshsets_levels = [meshsets_nv1, meshsets_nv2]
 
-for i in range(len(meshsets_levels)):
-    name, tag = utpy.enumerar_volumes_nivel(mb, meshsets_nv1, i+2)
-    tags_1[name] = tag
+# for i in range(len(meshsets_levels)):
+#     name, tag = utpy.enumerar_volumes_nivel(mb, meshsets_nv1, i+2)
+#     tags_1[name] = tag
 
 
 ####apagar
@@ -427,6 +416,7 @@ def run_3(loop):
     bif_utils.set_lamb(all_volumes)
     t2 = time.time()
     bif_utils.set_mobi_faces(all_volumes, faces_in, finos0=finos0)
+    bif_utils.set_finos(finos0, meshsets_nv1)
     t3 = time.time()
     adm_mesh.generate_adm_mesh(mb, all_volumes, loop=loop)
     t4 = time.time()
@@ -464,13 +454,26 @@ verif_imp = False
 cont_imp = 0
 verif_vpi = False
 contador = 0
+ver9 = 1
+
+vf = mb.create_meshset()
+mb.add_entities(vf, all_faces)
 
 if ADM:
+    list_tempos = []
+    tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
 
-    while verif:
+    with open('tempos_simulacao_adm.txt', 'w') as fil:
+        pass
 
+    while verif:
         t0 = time.time()
+        contador += 1
+        # if contador > 29:
+        #     contador = 0
+        #     pdb.set_trace()
+
         t, loop = run(t, loop)
 
 
@@ -499,8 +502,7 @@ if ADM:
         print(f'loop: {loop-1}')
         print(f'delta_t: {bif_utils.delta_t}\n')
 
-
-        bif_utils.get_hist_ms(t, dt)
+        bif_utils.get_hist_ms(t, dt, loop-1)
         ext_h5m = input_file + 'sol_multiescala_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop-1) + '.vtk'
 
@@ -514,7 +516,7 @@ if ADM:
             os.chdir(bifasico_sol_multiescala_dir)
             verif_vpi = False
 
-        mb.write_file(ext_h5m)
+        # mb.write_file(ext_h5m)
         print(f'loop: {loop}')
 
         if t2 > bif_utils.total_time or loop2 > bif_utils.loops or bif_utils.vpi > 0.99:
@@ -523,8 +525,20 @@ if ADM:
         if verif:
             run_3(loop)
 
+        t3 = time.time()
+        dt = t3-t0
+
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
+
+        with open('tempos_simulacao_adm.txt', 'a+') as fil:
+            fil.write(str(dt)+'\n')
+
+        if contador % 3:
+            os.system('clear')
+
+
+    tfim = time.time()
 
 elif ADM == False:
     os.chdir(bifasico_sol_direta_dir)
@@ -536,10 +550,25 @@ elif ADM == False:
     bifasico.gravity = bif_utils.gravity
     bifasico.mi_w = bif_utils.mi_w #Paxs
     bifasico.mi_o = bif_utils.mi_o
-    contador = 0
+    bifasico.gama_w = bif_utils.gama_w
+    bifasico.gama_o = bif_utils.gama_o
+    bifasico.Sor = bif_utils.Sor
+    bifasico.Swc = bif_utils.Swc
+    bifasico.nw = bif_utils.nw
+    bifasico.no = bif_utils.no
+    bifasico.loops = bif_utils.loops
+    bifasico.total_time = bif_utils.total_time
+    bifasico.gama = bif_utils.gama
+    with open('tempos_simulacao_direta.txt', 'w') as fil:
+        pass
+
+    tini = time.time()
 
     while verif:
         contador += 1
+
+        contador += 1
+        list_tempos = []
 
         t0 = time.time()
         bifasico.solution_PF(sol_adm.wirebasket_elems, map_global, faces_in, tags_1)
@@ -578,7 +607,7 @@ elif ADM == False:
         t1 = time.time()
         dt = t1-t0
 
-        bifasico.get_hist(t, dt)
+        bifasico.get_hist(t, dt, loop-1)
 
         ext_h5m = input_file + 'sol_direta_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_direta_' + str(loop-1) + '.vtk'
@@ -608,6 +637,17 @@ elif ADM == False:
             bifasico.set_lamb(all_volumes)
             bifasico.set_mobi_faces(all_volumes, faces_in)
 
+        t3 = time.time()
+        dt = t3-t0
+        with open('tempos_simulacao_direta.txt', 'a+') as fil:
+            fil.write(str(dt)+'\n')
 
-pdb.set_trace()
-pdb.set_trace()
+        if contador == 3:
+            contador = 0
+            os.system('clear')
+
+    tfim = time.time()
+
+
+import pdb; pdb.set_trace()
+import pdb; pdb.set_trace()

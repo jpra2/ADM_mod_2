@@ -2,19 +2,23 @@ import numpy as np
 from pymoab import core, types, rng, topo_util
 import os
 import conversao as conv
+import pdb
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
 flying_dir = os.path.join(parent_parent_dir, 'flying')
 
-k_pe_to_m = conv.pe_to_m(1.0)
-k_md_to_m2 = conv.milidarcy_to_m2(1.0)
-k_psi_to_pa = conv.psi_to_Pa(1.0)
+# k_pe_to_m = conv.pe_to_m(1.0)
+# k_md_to_m2 = conv.milidarcy_to_m2(1.0)
+# k_psi_to_pa = conv.psi_to_Pa(1.0)
+k_pe_to_m = 1.0
+k_md_to_m2 = 1.0
+k_psi_to_pa = 1.0
 
 def def_inter(mb, dict_tags):
-    intermediarios_tag = mb.tag_get_handle('intermediarios', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
-    elems_nivel2 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array(2))
+    intermediarios_tag = mb.tag_get_handle('intermediarios', 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
+    elems_nivel2 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['l3_ID']]), np.array([2]))
     intermediarios_meshset = mb.create_meshset()
     mb.add_entities(intermediarios_meshset, elems_nivel2)
     mb.tag_set_data(intermediarios_tag, 0, intermediarios_meshset)
@@ -33,9 +37,10 @@ def injector_producer(mb):
     mb.tag_set_data(wells_injector_tag, 0, wells_injector_meshset)
     mb.tag_set_data(wells_producer_tag, 0, wells_producer_meshset)
 
-def injector_producer_press(mb):
+def injector_producer_press(mb, mtu, gama_w, gama_o, gravity, all_nodes):
     press_tag = mb.tag_get_handle('P')
     volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([press_tag]), np.array([None]))
+    values = mb.tag_get_data(press_tag, volumes_d, flat=True)
     wells_injector_tag = mb.tag_get_handle('WELLS_INJECTOR', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
     wells_producer_tag = mb.tag_get_handle('WELLS_PRODUCER', 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
     wells_injector_meshset = mb.create_meshset()
@@ -57,7 +62,11 @@ def injector_producer_press(mb):
     mb.tag_set_data(wells_injector_tag, 0, wells_injector_meshset)
     mb.tag_set_data(wells_producer_tag, 0, wells_producer_meshset)
 
-    redefinir_pressoes(mb, injectors, producers, press_tag)
+    # redefinir_pressoes(mb, injectors, producers, press_tag)
+
+    if gravity:
+        set_p_with_gravity(mb, mtu, press_tag, all_nodes, injectors, producers, gama_w, gama_o)
+
 
 def redefinir_pressoes(mb, wells_injector, wells_producer, press_tag):
     p1 = 10.0
@@ -81,18 +90,23 @@ def create_names_tags():
     nn = np.array(names)
     np.save('list_names_tags', nn)
 
-def set_p_with_gravity(mb, mtu, volumes_d, press_tag, all_nodes, gama):
+def set_p_with_gravity(mb, mtu, press_tag, all_nodes, wells_injector, wells_producer, gama_w, gama_o):
 
-    values = (k_psi_to_pa)*mb.tag_get_data(press_tag, volumes_d, flat=True)
+    values_inj = (k_psi_to_pa)*mb.tag_get_data(press_tag, wells_injector, flat=True)
+    values_prod = (k_psi_to_pa)*mb.tag_get_data(press_tag, wells_producer, flat=True)
     coords = (k_pe_to_m)*mb.get_coords(all_nodes)
     coords = coords.reshape([len(all_nodes), 3])
     maxs = coords.max(axis=0)
     Lz = maxs[2]
     # z_elems_d = -1*np.array([mtu.get_average_position([v])[2] for v in volumes_d])
-    z_elems_d = -1*(k_pe_to_m)*np.array([mtu.get_average_position([v])[2] for v in volumes_d])
-    delta_z = z_elems_d + Lz
-    pressao = gama*(delta_z) + values
-    mb.tag_set_data(press_tag, volumes_d, pressao)
+    z_elems_inj = -1*(k_pe_to_m)*np.array([mtu.get_average_position([v])[2] for v in wells_injector])
+    delta_z = z_elems_inj + Lz
+    pressao = gama_w*(delta_z) + values_inj
+    mb.tag_set_data(press_tag, wells_injector, pressao)
+    z_elems_prod = -1*(k_pe_to_m)*np.array([mtu.get_average_position([v])[2] for v in wells_producer])
+    delta_z = z_elems_prod + Lz
+    pressao = gama_o*(delta_z) + values_prod
+    mb.tag_set_data(press_tag, wells_producer, pressao)
 
 def set_s_grav_faces(mb, keq_tag, all_volumes, all_centroids, faces_in, gamaf_tag, s_gravf_tag, ids_0, ids_1):
 

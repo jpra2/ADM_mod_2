@@ -2,6 +2,7 @@ import os
 import yaml
 import shutil
 import sys
+import pdb
 
 deletar = True # deletar os arquivos gerados
 somente_deletar = False # deletar os arquivos e sair do script
@@ -19,8 +20,14 @@ if deletar:
     bifasico_dir = os.path.join(flying_dir, 'bifasico')
     sol_direta = os.path.join(bifasico_dir, 'sol_direta')
     sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
-    shutil.rmtree(sol_multi)
-    shutil.rmtree(sol_direta)
+    try:
+        shutil.rmtree(sol_multi)
+    except:
+        pass
+    try:
+        shutil.rmtree(sol_direta)
+    except:
+        pass
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
     os.chdir(sol_direta)
@@ -34,8 +41,14 @@ if deletar:
     bifasico_dir = os.path.join(output_dir, 'bifasico')
     sol_direta = os.path.join(bifasico_dir, 'sol_direta')
     sol_multi = os.path.join(bifasico_dir, 'sol_multiescala')
-    shutil.rmtree(sol_multi)
-    shutil.rmtree(sol_direta)
+    try:
+        shutil.rmtree(sol_multi)
+    except:
+        pass
+    try:
+        shutil.rmtree(sol_direta)
+    except:
+        pass
     os.makedirs(sol_direta)
     os.makedirs(sol_multi)
     os.chdir(sol_direta)
@@ -78,6 +91,8 @@ def definir():
     loader.load_module('malha_adm_v01')
 
 # definir()
+#
+# pdb.set_trace()
 
 if bifasico == False:
     # loader = importlib.machinery.SourceFileLoader('solucao_adm_mono_v01', processor_dir + '/solucao_adm_mono_v01.py')
@@ -89,5 +104,6 @@ if bifasico == False:
 else:
     # loader = importlib.machinery.SourceFileLoader('run_bifasico', processor_dir + '/run_bifasico.py')
     # loader.load_module('run_bifasico')
+    import processor.run_bifasico
 
     from processor import run_bifasico
