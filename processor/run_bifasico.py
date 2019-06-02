@@ -537,6 +537,8 @@ if ADM:
         if contador % 3:
             os.system('clear')
 
+        pdb.set_trace()
+
 
     tfim = time.time()
 
