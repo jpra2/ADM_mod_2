@@ -861,7 +861,7 @@ class bifasico:
         all_gamav = self.mb.tag_get_data(self.gamav_tag, volumes, flat=True)
         # all_centroids = self.mb.tag_get_data(self.cent_tag, volumes)
         all_centroids = self.all_centroids
-        all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
+        # all_ks = self.mb.tag_get_data(self.perm_tag, volumes)
 
         all_flux_in_faces = self.mb.tag_get_data(self.flux_in_faces_tag, faces, flat=True)
         all_kharm = self.mb.tag_get_data(self.kharm_tag, faces, flat=True)
