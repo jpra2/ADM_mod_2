@@ -459,7 +459,7 @@ class sol_adm_bifasico:
 
         return As, s_grav
 
-    def get_AS_structured_v2_dep0(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
+    def get_AS_structured_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
         print('get As')
 
         all_s_gravs = mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)
@@ -500,7 +500,7 @@ class sol_adm_bifasico:
         As['Tf'] = Tf
         return As, s_grav
 
-    def get_AS_structured_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
+    def get_AS_structured_v2_v2(self, mb, dict_tags, faces_in, all_volumes, mobi_tag, map_volumes):
         print('get As')
 
         all_s_gravs = mb.tag_get_data(dict_tags['S_GRAV'], faces_in, flat=True)

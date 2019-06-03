@@ -180,23 +180,23 @@ def set_keq(all_volumes, faces_in, tags):
 
 
 # set_keq(all_volumes, faces_in, tags_1)
-info = dict()
-info['mb'] = mb
-info['all_faces'] = all_faces
-info['all_volumes'] = all_volumes
-info['volumes_d'] = sol_adm.volumes_d
-info['cent_tag'] = tags_1['CENT']
-info['press_tag'] = tags_1['P']
-info['area_tag'] = tags_1['AREA2']
-info['perm_tag'] = tags_1['PERM']
-info['k_eq_tag'] = tags_1['K_EQ']
+# info = dict()
+# info['mb'] = mb
+# info['all_faces'] = all_faces
+# info['all_volumes'] = all_volumes
+# info['volumes_d'] = sol_adm.volumes_d
+# info['cent_tag'] = tags_1['CENT']
+# info['press_tag'] = tags_1['P']
+# info['area_tag'] = tags_1['AREA2']
+# info['perm_tag'] = tags_1['PERM']
+# info['k_eq_tag'] = tags_1['K_EQ']
 
 # def1.convert_to_SI(info)
-del info
+# del info
 
 os.chdir(flying_dir)
 bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
-def1.set_k1_test(mb, tags_1['PERM'], all_volumes, bif_utils.all_centroids)
+# def1.set_k1_test(mb, tags_1['PERM'], all_volumes, bif_utils.all_centroids)
 # mb.write_file('testt.vtk', [vv])
 
 bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
@@ -389,8 +389,6 @@ def run_2(t):
     dt = t1 - t0
     tend = time.time()
     dtt = tend - tini
-    mb.write_file('teste.vtk', [vv])
-    pdb.set_trace()
     # print(f'tempo nv0 fluxo {dt}\n')
     bif_utils.calc_cfl(faces_in)
     bif_utils.verificar_cfl(all_volumes, loop)

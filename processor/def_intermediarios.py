@@ -67,7 +67,6 @@ def injector_producer_press(mb, mtu, gama_w, gama_o, gravity, all_nodes):
     if gravity:
         set_p_with_gravity(mb, mtu, press_tag, all_nodes, injectors, producers, gama_w, gama_o)
 
-
 def redefinir_pressoes(mb, wells_injector, wells_producer, press_tag):
     p1 = 10.0
     p2 = 1.0

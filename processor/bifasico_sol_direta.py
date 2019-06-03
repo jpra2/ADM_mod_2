@@ -23,7 +23,7 @@ import importlib.machinery
 
 class sol_direta_bif:
 
-    def __init__(self, mb, mtu, all_volumes):
+    def __init__(self, mb, mtu, all_volumes, data_loaded):
         self.k2 = 0.5
         self.cfl_ini = self.k2
         self.cfl = self.k2
@@ -84,12 +84,14 @@ class sol_direta_bif:
         phis = phis[bb]
         v0 = all_volumes[0]
         points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
-        coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
+        # coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
+        coords = self.mb.get_coords(points).reshape(len(points), 3)
         maxs = coords.max(axis=0)
         mins = coords.min(axis=0)
         hs = maxs - mins
         self.hs = hs
-        self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        # self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
 
         # hs[0] = conv.pe_to_m(hs[0])
         # hs[1] = conv.pe_to_m(hs[1])

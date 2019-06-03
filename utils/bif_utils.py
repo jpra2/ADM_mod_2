@@ -39,6 +39,7 @@ import importlib.machinery
 
 class bifasico:
     def __init__(self, mb, mtu, all_volumes, data_loaded):
+
         self.cfl_ini = 0.5
         self.delta_t_min = 100000
         self.perm_tag = mb.tag_get_handle('PERM')
@@ -114,7 +115,8 @@ class bifasico:
         self.fimin = phis.min()
         v0 = all_volumes[0]
         points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
-        coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
+        # coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
+        coords = self.mb.get_coords(points).reshape(len(points), 3)
         maxs = coords.max(axis=0)
         mins = coords.min(axis=0)
         hs = maxs - mins
@@ -125,7 +127,8 @@ class bifasico:
 
         self.hs = hs
         vol = hs[0]*hs[1]*hs[2]
-        self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        # self.Areas = (self.k_pe_m**2)*np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
+        self.Areas = np.array([hs[1]*hs[2], hs[0]*hs[2], hs[0]*hs[1]])
         self.mb.tag_set_data(self.volume_tag, all_volumes, np.repeat(vol, len(all_volumes)))
         self.Vmin = vol
         historico = np.array(['vpi', 'tempo', 'prod_agua', 'prod_oleo', 'wor', 'dt'])
@@ -1011,8 +1014,7 @@ class bifasico:
           map_pms_vols3 = dict(zip(vols3, pms_vols3))
           del pms_vols3
 
-        #   mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
-          mobi_in_faces = self.mb.tag_get_data(self.kdif_tag, faces, flat=True)
+          mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
           fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
           if self.gravity:
               s_gravs_faces = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
@@ -1115,8 +1117,8 @@ class bifasico:
 
     def set_flux_pms_elems_nv0(self, volumes, faces, pms_tag):
 
-        # mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
-        mobi_in_faces = self.mb.tag_get_data(self.kdif_tag, faces, flat=True)
+        mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
+        # mobi_in_faces = self.mb.tag_get_data(self.kdif_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
         if self.gravity:
             s_gravs_faces = self.mb.tag_get_data(self.s_grav_tag, faces, flat=True)
@@ -1506,7 +1508,7 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def calculate_pcorr_dep1(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
+    def calculate_pcorr(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
         """
         mb = core do pymoab
         elems_in_meshset = elementos dentro de um meshset
@@ -1591,7 +1593,7 @@ class bifasico:
         else:
             mb.tag_set_data(pcorr2_tag, elems_in_meshset, x)
 
-    def calculate_pcorr(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
+    def calculate_pcorr_v5(self, mb, elems_in_meshset, vertice, faces_boundary, faces, pcorr_tag, pms_tag, volumes_d, volumes_n, dict_tags, pcorr2_tag=None):
         """
         mb = core do pymoab
         elems_in_meshset = elementos dentro de um meshset
