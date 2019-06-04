@@ -1265,13 +1265,13 @@ class bifasico:
                 return True
 
             elif sat < self.Swc:
-                vv = self.mb.create_meshset()
-                self.mb.add_entities(vv, volumes)
-                self.mb.write_file('testtt.vtk', [vv])
-
-                pdb.set_trace()
+                # vv = self.mb.create_meshset()
+                # self.mb.add_entities(vv, volumes)
+                # self.mb.write_file('testtt.vtk', [vv])
+                #
+                # pdb.set_trace()
                 print('erro2')
-                pass
+                return True
 
 
             # elif sat > sat1 + 0.2:
@@ -2049,7 +2049,7 @@ class bifasico:
                 #     erro_cfl = False
                 # else:
                 #     self.cfl = cfl
-            if contagem > 100:
+            if contagem > 1000:
                 print('cfl nao convergiu')
                 print(f'cfl: {cfl}')
         t1 = time.time()
