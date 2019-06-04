@@ -435,6 +435,12 @@ def run(t, loop):
     # n2_adm = len(np.unique(mb.tag_get_data(tags_1['l2_ID'], all_volumes, flat=True)))
     n1_adm = mb.tag_get_data(tags_1['l1_ID'], all_volumes, flat=True).max() + 1
     n2_adm = mb.tag_get_data(tags_1['l2_ID'], all_volumes, flat=True).max() + 1
+    elems_nv0 = len(mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1])))
+    with open('volumes_finos.txt', 'a+') as fil:
+        fil.write(str(n1_adm)+' '+str(n2_adm)+' '+str(elems_nv0)+' '+str(loop)+'\n')
+
+
+
     run_PMS(n1_adm, n2_adm, loop)
     run_2(t)
     mb.write_file('testtt.vtk',[vv])
@@ -461,6 +467,9 @@ if ADM:
     list_tempos = []
     tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
+    with open('volumes_finos.txt', 'w') as fil:
+        fil.write('n1_adm n2_adm len(finos) loop\n')
+        pass
 
     with open('tempos_simulacao_adm.txt', 'w') as fil:
         pass
@@ -504,8 +513,8 @@ if ADM:
         ext_h5m = input_file + 'sol_multiescala_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop-1) + '.vtk'
 
-        if loop == 1 or imprimir_sempre:
-            mb.write_file(ext_vtk, [vv])
+        # if loop == 1 or imprimir_sempre:
+        #     mb.write_file(ext_vtk, [vv])
 
         if verif_vpi:
             os.chdir(out_bif_solmult_dir)
@@ -532,10 +541,12 @@ if ADM:
         with open('tempos_simulacao_adm.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
-        if contador % 3:
+        if contador % 3 == 0:
             os.system('clear')
 
-        pdb.set_trace()
+        if contador % 10 == 0:
+            mb.write_file(ext_vtk, [vv])
+
 
 
     tfim = time.time()
@@ -566,8 +577,6 @@ elif ADM == False:
 
     while verif:
         contador += 1
-
-        contador += 1
         list_tempos = []
 
         t0 = time.time()
@@ -578,10 +587,6 @@ elif ADM == False:
         bifasico.verificar_cfl(all_volumes, loop)
         print('loop: ', loop)
         print('delta_t: ', bifasico.delta_t, '\n')
-
-        if contador > 10:
-            pdb.set_trace()
-            contador = 0
 
 
         t += bifasico.delta_t
@@ -642,9 +647,11 @@ elif ADM == False:
         with open('tempos_simulacao_direta.txt', 'a+') as fil:
             fil.write(str(dt)+'\n')
 
-        if contador == 3:
-            contador = 0
+        if contador % 3 == 0:
             os.system('clear')
+
+        # if contador % 10 == 0:
+        #     mb.write_file(ext_vtk, [vv])
 
     tfim = time.time()
 

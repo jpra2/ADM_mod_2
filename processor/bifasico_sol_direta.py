@@ -244,9 +244,6 @@ class sol_direta_bif:
 
             pdb.set_trace()
 
-        pdb.set_trace()
-
-
     def calculate_total_flux_v2(self, volumes, faces):
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
         fws_faces = self.mb.tag_get_data(self.fw_in_faces_tag, faces, flat=True)
