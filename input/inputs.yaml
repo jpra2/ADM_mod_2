@@ -9,6 +9,8 @@ bifasico: True
 ADM: True
 # solucao multiescala ADM
 
+ler_anterior: False
+
 rs:
   # Distancia ate o ponto onde se mantem malha fina
   r0: 1

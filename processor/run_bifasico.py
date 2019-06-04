@@ -29,44 +29,40 @@ out_bif_dir = os.path.join(output_dir, 'bifasico')
 out_bif_soldir_dir =  os.path.join(out_bif_dir, 'sol_direta')
 out_bif_solmult_dir =  os.path.join(out_bif_dir, 'sol_multiescala')
 
-# k_pe_m = conv.pe_to_m(1.0)
-# k_md_to_m2 = conv.milidarcy_to_m2(1.0)
-k_pe_m = 1.0
-k_md_to_m2 = 1.0
+os.chdir(input_dir)
+with open("inputs.yaml", 'r') as stream:
+    data_loaded = yaml.load(stream)
 
-# import importlib.machinery
+ler_anterior = data_loaded['ler_anterior']
 
-# loader = importlib.machinery.SourceFileLoader('pymoab_utils', utils_dir + '/pymoab_utils.py')
-# utpy = loader.load_module('pymoab_utils')
-# loader = importlib.machinery.SourceFileLoader('others_utils', utils_dir + '/others_utils.py')
-# oth = loader.load_module('others_utils').OtherUtils
-# loader = importlib.machinery.SourceFileLoader('prol_tpfa', utils_dir + '/prolongation_ams.py')
-# prol_tpfa = loader.load_module('prol_tpfa')
-# loader = importlib.machinery.SourceFileLoader('malha_adm', parent_dir + '/malha_adm.py')
-# adm_mesh = loader.load_module('malha_adm')
-definter.create_names_tags()
-mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded = utpy.load_adm_mesh()
-
-# tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
-tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
-
-definter.def_inter(mb, tags_1)
+if ler_anterior:
+    pdb.set_trace()
+    pass
+else:
+    definter.create_names_tags()
+    mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre = utpy.load_adm_mesh()
+    tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+    all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+    definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
+    definter.criar_tags_bifasico(mb)
 
 os.chdir(flying_dir)
 faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
 intern_adjs_by_dual = np.load('intern_adjs_by_dual.npy')
 
-adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
-all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+k_pe_m = 1.0
+k_md_to_m2 = 1.0
+# k_pe_m = conv.pe_to_m(k_pe_m)
+# k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
 
-definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
-# definter.injector_producer(mb)
-# tags = [tags_1['l1_ID'], tags_1['l2_ID']]
-# for tag in tags:
-#     all_gids = mb.tag_get_data(tag, all_volumes, flat=True)
-#     minim = min(all_gids)
-#     all_gids -= minim
-#     mb.tag_set_data(tag, all_volumes, all_gids)
+
+# import importlib.machinery
+
+# tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
+# tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+
+adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
+
 
 vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
@@ -77,10 +73,6 @@ bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
 bif_utils.k_pe_m = k_pe_m
 
 bif_utils.gravity = data_loaded['gravity']
-# from processor import posteriori
-# posteriori.redefinir_permeabilidades(mb, all_volumes, bif_utils.all_centroids, bif_utils.perm_tag)
-# loader = importlib.machinery.SourceFileLoader('sol_adm_bifasico', parent_dir + '/sol_adm_bifasico.py')
-# sol_adm_bif = loader.load_module('sol_adm_bifasico')
 
 oth.gravity = bif_utils.gravity
 oth1 = oth(mb, mtu)
@@ -103,13 +95,14 @@ mb.add_entities(meshset_vertices, sol_adm.vertices)
 meshset_vertices_nv2 = mb.create_meshset()
 mb.add_entities(meshset_vertices_nv2, sol_adm.ver)
 n_levels = 3
-tags_1['PMS1'] = mb.tag_get_handle('PMS1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['PMS2'] = mb.tag_get_handle('PMS2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['PF'] = mb.tag_get_handle('PF', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['ERRO1'] = mb.tag_get_handle('ERRO1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['ERRO2'] = mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['PCORR1'] = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-tags_1['PCORR2'] = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
+tags_1['PMS1'] = mb.tag_get_handle('PMS1')
+tags_1['PMS2'] = mb.tag_get_handle('PMS2')
+tags_1['PF'] = mb.tag_get_handle('PF')
+tags_1['ERRO1'] = mb.tag_get_handle('ERRO1')
+tags_1['ERRO2'] = mb.tag_get_handle('ERRO2')
+tags_1['PCORR1'] = mb.tag_get_handle('PCORR1')
+tags_1['PCORR2'] = mb.tag_get_handle('PCORR2')
 meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
 meshsets_nv2 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_2']]), np.array([None]))
 meshsets_levels = [meshsets_nv1, meshsets_nv2]
@@ -124,8 +117,15 @@ meshsets_levels = [meshsets_nv1, meshsets_nv2]
 # mi = 1.0
 # bif_utils.mi_w = mi #Paxs
 # bif_utils.mi_o = mi
-bif_utils.set_sat_in(all_volumes)
-bif_utils.set_lamb(all_volumes)
+if ler_anterior:
+    pdb.set_trace()
+    pass
+else:
+    bif_utils.set_sat_in(all_volumes)
+    bif_utils.set_lamb(all_volumes)
+    bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
+    bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
+
 tags_1['S_GRAV'] = bif_utils.s_grav_tag
 # kk = 1e-30
 # k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
@@ -195,11 +195,11 @@ def set_keq(all_volumes, faces_in, tags):
 # del info
 
 os.chdir(flying_dir)
-bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
+
 # def1.set_k1_test(mb, tags_1['PERM'], all_volumes, bif_utils.all_centroids)
 # mb.write_file('testt.vtk', [vv])
 
-bif_utils.set_mobi_faces_ini(all_volumes, faces_in)
+
 k00 = 2.0
 k01 = 1e-3
 # vazao_inj = 5000*k01 #bbl/dia
@@ -220,8 +220,10 @@ k01 = 1e-3
 map_values_d = dict(zip(sol_adm.volumes_d, mb.tag_get_data(tags_1['P'], sol_adm.volumes_d, flat=True)))
 map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.volumes_n, flat=True)))
 
-finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
-# meshsets_nv1 = mb.get_entities_by_type_and_tag(0, types.MBENTITYSET, np.array([tags_1['PRIMAL_ID_1']]), np.array([None]))
+# finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
+finos0 = mb.tag_get_data(tags_1['finos0'], 0, flat=True)[0]
+finos0 = mb.get_entities_by_handle(finos0)
+
 
 def run_PMS(n1_adm, n2_adm, loop):
 
@@ -523,7 +525,7 @@ if ADM:
             os.chdir(bifasico_sol_multiescala_dir)
             verif_vpi = False
 
-        # mb.write_file(ext_h5m)
+        mb.write_file(ext_h5m)
         print(f'loop: {loop}')
 
         if t2 > bif_utils.total_time or loop2 > bif_utils.loops or bif_utils.vpi > 0.99:
@@ -546,7 +548,6 @@ if ADM:
 
         if contador % 10 == 0:
             mb.write_file(ext_vtk, [vv])
-
 
 
     tfim = time.time()

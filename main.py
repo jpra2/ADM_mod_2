@@ -15,7 +15,13 @@ preprocessor_dir = os.path.join(parent_dir, 'preprocessor')
 processor_dir = os.path.join(parent_dir, 'processor')
 output_dir = os.path.join(parent_dir, 'output')
 
-if deletar:
+os.chdir(input_dir)
+with open("inputs.yaml", 'r') as stream:
+    data_loaded = yaml.load(stream)
+
+ler_anterior = data_loaded['ler_anterior']
+
+if deletar and (not ler_anterior):
     ### deletar arquivos no flying
     bifasico_dir = os.path.join(flying_dir, 'bifasico')
     sol_direta = os.path.join(bifasico_dir, 'sol_direta')
@@ -61,9 +67,7 @@ if deletar:
     if somente_deletar:
         sys.exit(0)
 
-os.chdir(input_dir)
-with open("inputs.yaml", 'r') as stream:
-    data_loaded = yaml.load(stream)
+
 
 bifasico = data_loaded['bifasico']
 
@@ -106,4 +110,4 @@ else:
     # loader.load_module('run_bifasico')
     import processor.run_bifasico
 
-    from processor import run_bifasico
+    # from processor import run_bifasico
