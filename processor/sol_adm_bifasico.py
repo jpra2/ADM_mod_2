@@ -27,7 +27,7 @@ class sol_adm_bifasico:
         self.arestas=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([2]))
         self.vertices=mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([dict_tags['d1']]), np.array([3]))
         self.wirebasket_elems = list(self.internos) + list(self.faces) + list(self.arestas) + list(self.vertices)
-        self.kdif_tag = mb.tag_get_handle('KDIF')
+        
 
         self.ni=len(self.internos)
         self.nf=len(self.faces)

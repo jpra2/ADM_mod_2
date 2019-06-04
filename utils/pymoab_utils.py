@@ -174,7 +174,7 @@ def load_adm_mesh():
     tags_1 = get_all_tags_2(mb, list_names_tags)
     os.chdir(parent_dir)
 
-    return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, data_loaded
+    return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre
 
 def enumerar_volumes_nivel(mb, meshsets, level):
     name_tag = 'IDS_NA_PRIMAL_' + str(level)
