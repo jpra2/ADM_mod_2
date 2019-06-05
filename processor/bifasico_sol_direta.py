@@ -454,9 +454,9 @@ class sol_direta_bif:
             #     return 1
 
             elif sat < self.Swc:
-                pdb.set_trace()
+
                 print('erro2')
-                pass
+                return 1
 
             #elif sat < 0 or sat > (1 - self.Sor):
             elif sat < 0 or sat > 1:
@@ -468,7 +468,7 @@ class sol_direta_bif:
                 # print('V: {0}'.format(V))
                 print('delta_t: {0}'.format(delta_t))
                 print('loop: {0}'.format(loop))
-                import pdb; pdb.set_trace()
+                pdb.set_trace()
                 return 1
 
             else:
@@ -634,7 +634,7 @@ class sol_direta_bif:
         # self.vpi += vpi
         return cfl
 
-    def get_hist(self, t, dt, loop):
+    def get_hist_dep0(self, t, dt, loop):
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
 
@@ -646,6 +646,21 @@ class sol_direta_bif:
 
 
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
+        name = 'historico_' + str(loop)
+        np.save(name, hist)
+
+    def get_hist(self, t, dt, loop):
+        flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
+        fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
+
+        qw = (flux_total_prod*fws).sum()*self.delta_t
+        qo = (flux_total_prod.sum() - qw)*self.delta_t
+        wor = qw/float(qo)
+        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        self.vpi += vpi
+        self.hist = np.array([self.vpi, t, qw, qo, wor, dt])
+
+    def print_hist(self, loop):
         name = 'historico_' + str(loop)
         np.save(name, hist)
 
@@ -1067,7 +1082,7 @@ class sol_direta_bif:
                     # erro_cfl = False
                 # else:
                 #     self.cfl = cfl
-            if contagem > 100:
+            if contagem > 1000:
                 print('cfl nao converge ')
                 print(self.delta_t)
                 print(cfl)

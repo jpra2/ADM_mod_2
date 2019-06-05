@@ -131,7 +131,37 @@ def converter_keq(mb, k_eq_tag, faces_in):
     keqs *= kk*kk2
     mb.tag_set_data(k_eq_tag, faces_in, keqs)
 
-def convert_to_SI(info):
+def convert_to_SI_dep0(info):
+
+    mb = info['mb']
+    all_faces = info['all_faces']
+    all_volumes = info['all_volumes']
+    volumes_d = info['volumes_d']
+    cent_tag = info['cent_tag']
+    press_tag = info['press_tag']
+    area_tag = info['area_tag']
+    perm_tag = info['perm_tag']
+    k_eq_tag = info['k_eq_tag']
+
+    areas = (k_pe_to_m**2)*mb.tag_get_data(area_tag, all_faces, flat=True)
+    mb.tag_set_data(area_tag, all_faces, areas)
+
+    press_values = (k_psi_to_pa)*mb.tag_get_data(press_tag, volumes_d, flat=True)
+    mb.tag_set_data(press_tag, volumes_d, press_values)
+
+    centroids = (k_pe_to_m)*mb.tag_get_data(cent_tag, all_volumes)
+    mb.tag_set_data(cent_tag, all_volumes, centroids)
+
+    # keqs = (k_pe_to_m**2)*(k_md_to_m2)*mb.tag_get_data(k_eq_tag, all_faces, flat=True)
+    # mb.tag_set_data(k_eq_tag, all_faces, keqs)
+
+    perms = mb.tag_get_data(perm_tag, all_volumes)
+
+    for i, v in enumerate(all_volumes):
+        perm = perms[i]
+        mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)
+
+def convert_to_SI(mb, p_tag, q_tag, k_harm_tag, cent_tag):
 
     mb = info['mb']
     all_faces = info['all_faces']
@@ -270,6 +300,7 @@ def carregar_dados_anterior(data_loaded, loop):
     name_historico = 'historico_' + str(loop) + '.npy'
     historico = np.load(name_historico)
     t_loop = historico[1]
+    vpi = historico[0]
 
     os.chdir(flying_dir)
     list_names_tags = np.load('list_names_tags.npy')
@@ -280,4 +311,4 @@ def carregar_dados_anterior(data_loaded, loop):
     imprimir_sempre = data_loaded['imprimir_sempre']
     all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
 
-    return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop
+    return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop, vpi

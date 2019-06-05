@@ -37,7 +37,7 @@ ler_anterior = data_loaded['ler_anterior']
 loop_anterior = data_loaded['loop_anterior']
 
 if ler_anterior:
-    mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop = definter.carregar_dados_anterior(data_loaded, loop_anterior)
+    mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop, vpi_ant = definter.carregar_dados_anterior(data_loaded, loop_anterior)
     tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
     pass
 else:
@@ -451,6 +451,7 @@ def run(t, loop):
     loop+=1
     return t2, loop
 
+#############################################
 loops = 10
 t = 0
 loop = 0
@@ -462,16 +463,17 @@ cont_imp = 0
 verif_vpi = False
 contador = 0
 ver9 = 1
-q_impressao = 2
+q_impressao = 10
+#############################################
 
 vf = mb.create_meshset()
 mb.add_entities(vf, all_faces)
 
 if ADM:
 
-    pdb.set_trace()
     if ler_anterior:
         loop = loop_anterior + 1
+        bif_utils.vpi = vpi_ant
         t = t_loop
         if contar_tempo:
             t2 = t_loop
@@ -523,6 +525,7 @@ if ADM:
         print(f'loop: {loop-1}')
         print(f'delta_t: {bif_utils.delta_t}\n')
 
+        bif_utils.get_hist_ms(t, dt, loop-1)
         ext_h5m = input_file + 'sol_multiescala_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop-1) + '.vtk'
 
@@ -537,6 +540,14 @@ if ADM:
             verif_vpi = False
 
         print(f'loop: {loop}')
+        dtt0 = 0.0
+
+        if contador % q_impressao == 0:
+            tt0 = time.time()
+            ids_levels = mb.tag_get_data(tags_1['l3_ID'], all_volumes, flat=True)
+            mb.tag_set_data(tags_1['l3_ID_last'], all_volumes, ids_levels)
+            tt1 = time.time()
+            dtt0 = tt1 - tt0
 
         if t2 > bif_utils.total_time or loop2 > bif_utils.loops or bif_utils.vpi > 0.99:
             verif = False
@@ -545,7 +556,7 @@ if ADM:
             run_3(loop)
 
         t3 = time.time()
-        dt = t3-t0
+        dt = (t3-t0) - dtt0
 
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
@@ -556,11 +567,10 @@ if ADM:
         if contador % q_impressao == 0:
             with open('tempos_simulacao_adm.txt', 'a+') as fil:
                 fil.write(str(dt)+'\n')
-            ids_levels = mb.tag_get_data(tags_1['l3_ID'], all_volumes, flat=True)
-            mb.tag_set_data(tags_1['l3_ID_last'], all_volumes, ids_levels)
-            bif_utils.get_hist_ms(t, dt, loop-1)
+            bif_utils.print_hist(loop-1)
             mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
+            pdb.set_trace()
 
     tfim = time.time()
 
@@ -587,6 +597,7 @@ elif ADM == False:
     if ler_anterior:
         loop = loop_anterior + 1
         t = t_loop
+        bifasico.vpi = vpi_ant
         if contar_tempo:
             t2 = t_loop
         if contar_loop:
@@ -611,7 +622,6 @@ elif ADM == False:
         print('loop: ', loop)
         print('delta_t: ', bifasico.delta_t, '\n')
 
-
         t += bifasico.delta_t
         loop += 1
 
@@ -635,6 +645,7 @@ elif ADM == False:
         t1 = time.time()
         dt = t1-t0
 
+        bifasico.get_hist(t, dt, loop-1)
         ext_h5m = input_file + 'sol_direta_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_direta_' + str(loop-1) + '.vtk'
 
@@ -653,7 +664,8 @@ elif ADM == False:
 
         print(f'loop: {loop}')
 
-        if t2 > bifasico.total_time or loop2 > bifasico.loops or bifasico.vpi > 0.99:
+        # if t2 > bifasico.total_time or loop2 > bifasico.loops or bifasico.vpi > 0.99:
+        if t2 > bifasico.total_time or loop2 > bifasico.loops:
             verif = False
 
         if verif:
@@ -672,7 +684,7 @@ elif ADM == False:
         if contador % q_impressao == 0:
             with open('tempos_simulacao_direta.txt', 'a+') as fil:
                 fil.write(str(dt)+'\n')
-            bifasico.get_hist(t, dt, loop-1)
+            bifasico.print_hist(loop-1)
             mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
 

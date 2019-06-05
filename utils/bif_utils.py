@@ -2013,7 +2013,7 @@ class bifasico:
         self.Tf2 = Tf.copy()
         self.b2 = b.copy()
 
-    def get_hist_ms(self, t, dt, loop):
+    def get_hist_ms_dep0(self, t, dt, loop):
 
         flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
         fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
@@ -2027,6 +2027,22 @@ class bifasico:
         hist = np.array([self.vpi, t, qw, qo, wor, dt])
         name = 'historico_' + str(loop)
         np.save(name, hist)
+
+    def get_hist_ms(self, t, dt, loop):
+
+        flux_total_prod = self.mb.tag_get_data(self.total_flux_tag, self.wells_producer, flat=True)
+        fws = self.mb.tag_get_data(self.fw_tag, self.wells_producer, flat=True)
+
+        qw = (flux_total_prod*fws).sum()*self.delta_t
+        qo = (flux_total_prod.sum()- qw)*self.delta_t
+        wor = qw/float(qo)
+        vpi = (self.flux_total_prod*self.delta_t)/self.V_total
+        self.vpi += vpi
+        self.hist = np.array([self.vpi, t, qw, qo, wor, dt])
+
+    def print_hist(self, loop):
+        name = 'historico_' + str(loop)
+        np.save(name, self.hist)
 
     def verificar_cfl(self, volumes, loop):
         t0 = time.time()
