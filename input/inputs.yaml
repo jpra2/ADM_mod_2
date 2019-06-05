@@ -10,6 +10,7 @@ ADM: True
 # solucao multiescala ADM
 
 ler_anterior: False
+loop_anterior: 1
 
 rs:
   # Distancia ate o ponto onde se mantem malha fina

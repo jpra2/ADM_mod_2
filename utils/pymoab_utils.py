@@ -169,7 +169,7 @@ def load_adm_mesh():
     os.chdir(flying_dir)
     mb.load_file(ext_h5m_adm)
     list_names_tags = np.load('list_names_tags.npy')
-    list_names_tags = np.delete(list_names_tags, np.where(list_names_tags == 'L_TOT')[0])
+    # list_names_tags = np.delete(list_names_tags, np.where(list_names_tags == 'L_TOT')[0])
     # names_tags_with_level = np.load('names_tags_with_level.npy')
     tags_1 = get_all_tags_2(mb, list_names_tags)
     os.chdir(parent_dir)

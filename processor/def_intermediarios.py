@@ -235,3 +235,45 @@ def criar_tags_bifasico(mb):
     erro2_tag = mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
     pcorr1_tag = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
     pcorr2_tag = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
+def carregar_dados_anterior(data_loaded, loop):
+
+    from utils import pymoab_utils as utpy
+
+    parent_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_parent_dir = os.path.dirname(parent_dir)
+    input_dir = os.path.join(parent_parent_dir, 'input')
+    flying_dir = os.path.join(parent_parent_dir, 'flying')
+    bifasico_dir = os.path.join(flying_dir, 'bifasico')
+    bifasico_sol_direta_dir = os.path.join(bifasico_dir, 'sol_direta')
+    bifasico_sol_multiescala_dir = os.path.join(bifasico_dir, 'sol_multiescala')
+    utils_dir = os.path.join(parent_parent_dir, 'utils')
+
+    ADM = data_loaded['ADM']
+    input_file = data_loaded['input_file']
+
+    if ADM:
+        caminho = bifasico_sol_multiescala_dir
+        ext_h5m = input_file + 'sol_multiescala_' + str(loop) + '.h5m'
+    else:
+        caminho = bifasico_sol_direta_dir
+        ext_h5m = input_file + 'sol_direta_' + str(loop) + '.h5m'
+
+    os.chdir(caminho)
+    mb = core.Core()
+    mtu = topo_util.MeshTopoUtil(mb)
+    mb.load_file(ext_h5m)
+    name_historico = 'historico_' + str(loop) + '.npy'
+    historico = np.load(name_historico)
+    t_loop = historico[1]
+
+    os.chdir(flying_dir)
+    list_names_tags = np.load('list_names_tags.npy')
+    tags_1 = utpy.get_all_tags_2(mb, list_names_tags)
+    tempos_impr = data_loaded['tempos_vpi_impressao']
+    contar_loop = data_loaded['contar_loop']
+    contar_tempo = data_loaded['contar_tempo']
+    imprimir_sempre = data_loaded['imprimir_sempre']
+    all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+
+    return mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop

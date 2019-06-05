@@ -34,17 +34,29 @@ with open("inputs.yaml", 'r') as stream:
     data_loaded = yaml.load(stream)
 
 ler_anterior = data_loaded['ler_anterior']
+loop_anterior = data_loaded['loop_anterior']
 
 if ler_anterior:
+    mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop = definter.carregar_dados_anterior(data_loaded, loop_anterior)
+    tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+
+
     pdb.set_trace()
     pass
 else:
     definter.create_names_tags()
     mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre = utpy.load_adm_mesh()
-    tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
     all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
     definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
     definter.criar_tags_bifasico(mb)
+    tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
+
+adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
+bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
+bif_utils.gravity = data_loaded['gravity']
+oth.gravity = bif_utils.gravity
+oth1 = oth(mb, mtu)
+sol_adm = sol_adm_bif.sol_adm_bifasico(mb, tags_1, oth.gravity, all_volumes, data_loaded)
 
 os.chdir(flying_dir)
 faces_adjs_by_dual = np.load('faces_adjs_by_dual.npy')
@@ -61,22 +73,13 @@ k_md_to_m2 = 1.0
 # tags_1['l3_ID'] = mb.tag_get_handle('NIVEL_ID')
 # tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 
-adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
-
-
 vv = mb.create_meshset()
 mb.add_entities(vv, all_volumes)
 os.chdir(bifasico_sol_multiescala_dir)
 # loader = importlib.machinery.SourceFileLoader('bif_utils', utils_dir + '/bif_utils.py')
 # bif_utils = loader.load_module('bif_utils').bifasico(mb, mtu, all_volumes)
-bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
+
 bif_utils.k_pe_m = k_pe_m
-
-bif_utils.gravity = data_loaded['gravity']
-
-oth.gravity = bif_utils.gravity
-oth1 = oth(mb, mtu)
-sol_adm = sol_adm_bif.sol_adm_bifasico(mb, tags_1, oth.gravity, all_volumes, data_loaded)
 
 all_ids_reord = mb.tag_get_data(tags_1['ID_reord_tag'], all_volumes, flat=True)
 map_global = dict(zip(all_volumes, all_ids_reord))
@@ -461,11 +464,21 @@ cont_imp = 0
 verif_vpi = False
 contador = 0
 ver9 = 1
+q_impressao = 10
 
 vf = mb.create_meshset()
 mb.add_entities(vf, all_faces)
 
 if ADM:
+
+    if ler_anterior:
+        loop = loop_anterior + 1
+        t = t_loop
+        if contar_tempo:
+            t2 = t_loop
+        if contar_loop:
+            loop2 = loop
+
     list_tempos = []
     tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
@@ -484,8 +497,6 @@ if ADM:
         #     pdb.set_trace()
 
         t, loop = run(t, loop)
-
-
 
         # if cont_imp < len(tempos_impr):
         #     if bif_utils.vpi >= tempos_impr[cont_imp]:
@@ -511,7 +522,6 @@ if ADM:
         print(f'loop: {loop-1}')
         print(f'delta_t: {bif_utils.delta_t}\n')
 
-        bif_utils.get_hist_ms(t, dt, loop-1)
         ext_h5m = input_file + 'sol_multiescala_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_multiescala_' + str(loop-1) + '.vtk'
 
@@ -525,7 +535,6 @@ if ADM:
             os.chdir(bifasico_sol_multiescala_dir)
             verif_vpi = False
 
-        mb.write_file(ext_h5m)
         print(f'loop: {loop}')
 
         if t2 > bif_utils.total_time or loop2 > bif_utils.loops or bif_utils.vpi > 0.99:
@@ -540,15 +549,15 @@ if ADM:
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
 
-        with open('tempos_simulacao_adm.txt', 'a+') as fil:
-            fil.write(str(dt)+'\n')
-
         if contador % 3 == 0:
             os.system('clear')
 
-        if contador % 10 == 0:
+        if contador % q_impressao == 0:
+            with open('tempos_simulacao_adm.txt', 'a+') as fil:
+                fil.write(str(dt)+'\n')
+            bif_utils.get_hist_ms(t, dt, loop-1)
+            mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
-
 
     tfim = time.time()
 
@@ -571,6 +580,16 @@ elif ADM == False:
     bifasico.loops = bif_utils.loops
     bifasico.total_time = bif_utils.total_time
     bifasico.gama = bif_utils.gama
+
+    if ler_anterior:
+        loop = loop_anterior + 1
+        t = t_loop
+        if contar_tempo:
+            t2 = t_loop
+        if contar_loop:
+            loop2 = loop
+
+
     with open('tempos_simulacao_direta.txt', 'w') as fil:
         pass
 
@@ -613,13 +632,11 @@ elif ADM == False:
         t1 = time.time()
         dt = t1-t0
 
-        bifasico.get_hist(t, dt, loop-1)
-
         ext_h5m = input_file + 'sol_direta_' + str(loop-1) + '.h5m'
         ext_vtk = input_file + 'sol_direta_' + str(loop-1) + '.vtk'
 
-        if loop == 0 or imprimir_sempre:
-            mb.write_file(ext_vtk, [vv])
+        # if loop == 0 or imprimir_sempre:
+        #     mb.write_file(ext_vtk, [vv])
 
         # if imprimir_sempre:
         #     mb.write_file(ext_vtk, [vv])
@@ -631,7 +648,6 @@ elif ADM == False:
             os.chdir(bifasico_sol_direta_dir)
             verif_vpi = False
 
-        mb.write_file(ext_h5m)
         print(f'loop: {loop}')
 
         if t2 > bifasico.total_time or loop2 > bifasico.loops or bifasico.vpi > 0.99:
@@ -645,14 +661,17 @@ elif ADM == False:
 
         t3 = time.time()
         dt = t3-t0
-        with open('tempos_simulacao_direta.txt', 'a+') as fil:
-            fil.write(str(dt)+'\n')
+
 
         if contador % 3 == 0:
             os.system('clear')
 
-        # if contador % 10 == 0:
-        #     mb.write_file(ext_vtk, [vv])
+        if contador % q_impressao == 0:
+            with open('tempos_simulacao_direta.txt', 'a+') as fil:
+                fil.write(str(dt)+'\n')
+            bifasico.get_hist(t, dt, loop-1)
+            mb.write_file(ext_h5m)
+            mb.write_file(ext_vtk, [vv])
 
     tfim = time.time()
 
