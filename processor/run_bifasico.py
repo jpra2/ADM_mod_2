@@ -39,9 +39,6 @@ loop_anterior = data_loaded['loop_anterior']
 if ler_anterior:
     mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop = definter.carregar_dados_anterior(data_loaded, loop_anterior)
     tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
-
-
-    pdb.set_trace()
     pass
 else:
     definter.create_names_tags()
@@ -87,6 +84,7 @@ boundary_faces = mb.tag_get_data(tags_1['FACES_BOUNDARY'], 0, flat=True)[0]
 boundary_faces = mb.get_entities_by_handle(boundary_faces)
 faces_in = rng.subtract(all_faces, boundary_faces)
 bif_utils.all_faces_in = faces_in
+bif_utils.Adjs = [mb.get_adjacencies(face, 3) for face in faces_in]
 name_tag_faces_boundary_meshsets = 'FACES_BOUNDARY_MESHSETS_LEVEL_'
 boundary_faces_nv2 = mb.get_entities_by_handle(mb.tag_get_data(mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(2)), 0, flat=True)[0])
 boundary_faces_nv3 = mb.get_entities_by_handle(mb.tag_get_data(mb.tag_get_handle(name_tag_faces_boundary_meshsets+str(3)), 0, flat=True)[0])
@@ -121,7 +119,6 @@ meshsets_levels = [meshsets_nv1, meshsets_nv2]
 # bif_utils.mi_w = mi #Paxs
 # bif_utils.mi_o = mi
 if ler_anterior:
-    pdb.set_trace()
     pass
 else:
     bif_utils.set_sat_in(all_volumes)
@@ -130,6 +127,8 @@ else:
     bif_utils.all_centroids = mb.tag_get_data(tags_1['CENT'], all_volumes)
 
 tags_1['S_GRAV'] = bif_utils.s_grav_tag
+tags_1['l3_ID_last'] = mb.tag_get_handle('l3_ID_last')
+# tags_1['l3_ID_last'] = mb.tag_get_handle('l3_ID_last', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
 # kk = 1e-30
 # k = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
 # for v in all_volumes:
@@ -226,7 +225,6 @@ map_values_n = dict(zip(sol_adm.volumes_n, mb.tag_get_data(tags_1['Q'], sol_adm.
 # finos0 = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([tags_1['l3_ID']]), np.array([1]))
 finos0 = mb.tag_get_data(tags_1['finos0'], 0, flat=True)[0]
 finos0 = mb.get_entities_by_handle(finos0)
-
 
 def run_PMS(n1_adm, n2_adm, loop):
 
@@ -464,13 +462,14 @@ cont_imp = 0
 verif_vpi = False
 contador = 0
 ver9 = 1
-q_impressao = 10
+q_impressao = 2
 
 vf = mb.create_meshset()
 mb.add_entities(vf, all_faces)
 
 if ADM:
 
+    pdb.set_trace()
     if ler_anterior:
         loop = loop_anterior + 1
         t = t_loop
@@ -479,15 +478,17 @@ if ADM:
         if contar_loop:
             loop2 = loop
 
+    else:
+        with open('volumes_finos.txt', 'w') as fil:
+            fil.write('n1_adm n2_adm len(finos) loop\n')
+            pass
+
+        with open('tempos_simulacao_adm.txt', 'w') as fil:
+            pass
+
     list_tempos = []
     tini = time.time()
     os.chdir(bifasico_sol_multiescala_dir)
-    with open('volumes_finos.txt', 'w') as fil:
-        fil.write('n1_adm n2_adm len(finos) loop\n')
-        pass
-
-    with open('tempos_simulacao_adm.txt', 'w') as fil:
-        pass
 
     while verif:
         t0 = time.time()
@@ -555,6 +556,8 @@ if ADM:
         if contador % q_impressao == 0:
             with open('tempos_simulacao_adm.txt', 'a+') as fil:
                 fil.write(str(dt)+'\n')
+            ids_levels = mb.tag_get_data(tags_1['l3_ID'], all_volumes, flat=True)
+            mb.tag_set_data(tags_1['l3_ID_last'], all_volumes, ids_levels)
             bif_utils.get_hist_ms(t, dt, loop-1)
             mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
@@ -589,9 +592,9 @@ elif ADM == False:
         if contar_loop:
             loop2 = loop
 
-
-    with open('tempos_simulacao_direta.txt', 'w') as fil:
-        pass
+    else:
+        with open('tempos_simulacao_direta.txt', 'w') as fil:
+            pass
 
     tini = time.time()
 

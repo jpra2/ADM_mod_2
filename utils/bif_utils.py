@@ -523,8 +523,8 @@ class bifasico:
         all_fw_in_face = all_mobi_in_faces.copy()
         all_dfds = all_mobi_in_faces.copy()
         all_gamaf = all_mobi_in_faces.copy()
-        Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
-        self.Adjs = Adjs
+        # Adjs = [self.mb.get_adjacencies(face, 3) for face in all_faces_in]
+        Adjs = self.Adjs
 
         for i, face in enumerate(all_faces_in):
             elems = Adjs[i]

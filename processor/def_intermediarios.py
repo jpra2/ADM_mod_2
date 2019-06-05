@@ -9,12 +9,15 @@ parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
 flying_dir = os.path.join(parent_parent_dir, 'flying')
 
-# k_pe_to_m = conv.pe_to_m(1.0)
-# k_md_to_m2 = conv.milidarcy_to_m2(1.0)
-# k_psi_to_pa = conv.psi_to_Pa(1.0)
 k_pe_to_m = 1.0
 k_md_to_m2 = 1.0
 k_psi_to_pa = 1.0
+k_bbldia_to_m3seg = 1.0
+# k_pe_to_m = conv.pe_to_m(k_pe_to_m)
+# k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
+# k_psi_to_pa = conv.psi_to_Pa(k_psi_to_pa)
+# k_bbldia_to_m3seg = conv.bbldia_to_m3seg(k_bbldia_to_m3seg)
+
 
 def def_inter(mb, dict_tags):
     intermediarios_tag = mb.tag_get_handle('intermediarios', 1, types.MB_TYPE_HANDLE, types.MB_TAG_MESH, True)
@@ -235,6 +238,7 @@ def criar_tags_bifasico(mb):
     erro2_tag = mb.tag_get_handle('ERRO2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
     pcorr1_tag = mb.tag_get_handle('PCORR1', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
     pcorr2_tag = mb.tag_get_handle('PCORR2', 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+    l3idlast_tag = mb.tag_get_handle('l3_ID_last', 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True)
 
 def carregar_dados_anterior(data_loaded, loop):
 

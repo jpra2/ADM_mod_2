@@ -9,7 +9,7 @@ bifasico: True
 ADM: True
 # solucao multiescala ADM
 
-ler_anterior: False
+ler_anterior: True
 loop_anterior: 1
 
 rs:
