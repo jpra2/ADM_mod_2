@@ -201,48 +201,48 @@ class sol_direta_bif:
         self.mb.tag_set_data(self.s_grav_volume_tag, volumes, fluxo_grav_volumes)
 
 
-        vv2 = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
-        inds = np.where(vv2 < -1e-10)[0]
-
-        c1 = set(inds)
-        c2 = set(ids_vds)
-        c3 = c1 - c2
-
-        if len(c3) > 0:
-
-            inds = np.array(list(c3))
-            gg = vv2[inds]
-            vols = np.array(volumes)[inds]
-
-            pdb.set_trace()
-
-            faces_vols = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in vols]
-            faces_vols = [rng.intersect(fs, faces) for fs in faces_vols]
-            adjs_vols = [self.mtu.get_bridge_adjacencies(v, 2, 3) for v in vols]
-            sats_adjs = np.array([self.mb.tag_get_data(self.sat_tag, adjs, flat=True) for adjs in adjs_vols])
-            sats_vols = self.mb.tag_get_data(self.sat_tag, vols, flat=True)
-            keqs_faces = []
-            for fs in faces_vols:
-                keqs_faces.append(self.mb.tag_get_data(self.mobi_in_faces_tag, fs, flat=True))
-
-            ttt = []
-            for fs, v in zip(faces_vols, vols):
-                fl = 0.0
-                fs2 = rng.subtract(rng.Range(fs), self.boundary_faces)
-                for f in fs2:
-                    fl0 = self.mb.tag_get_data(self.flux_in_faces_tag, f, flat=True)[0]
-                    fw = self.mb.tag_get_data(self.fw_in_faces_tag, f, flat=True)[0]
-                    adjs = np.array(self.mb.get_adjacencies(f, 3))
-                    sat2 = self.mb.tag_get_data(self.sat_tag, adjs, flat=True)
-                    pf2 = self.mb.tag_get_data(self.pf_tag, adjs, flat=True)
-                    if v == adjs[0]:
-                        fl += fl0*fw
-                    else:
-                        fl -= fl0*fw
-
-                ttt.append(fl)
-
-            pdb.set_trace()
+        # vv2 = self.mb.tag_get_data(self.flux_w_tag, volumes, flat=True)
+        # inds = np.where(vv2 < -1e-10)[0]
+        #
+        # c1 = set(inds)
+        # c2 = set(ids_vds)
+        # c3 = c1 - c2
+        #
+        # if len(c3) > 0:
+        #
+        #     inds = np.array(list(c3))
+        #     gg = vv2[inds]
+        #     vols = np.array(volumes)[inds]
+        #
+        #     pdb.set_trace()
+        #
+        #     faces_vols = [self.mtu.get_bridge_adjacencies(v, 3, 2) for v in vols]
+        #     faces_vols = [rng.intersect(fs, faces) for fs in faces_vols]
+        #     adjs_vols = [self.mtu.get_bridge_adjacencies(v, 2, 3) for v in vols]
+        #     sats_adjs = np.array([self.mb.tag_get_data(self.sat_tag, adjs, flat=True) for adjs in adjs_vols])
+        #     sats_vols = self.mb.tag_get_data(self.sat_tag, vols, flat=True)
+        #     keqs_faces = []
+        #     for fs in faces_vols:
+        #         keqs_faces.append(self.mb.tag_get_data(self.mobi_in_faces_tag, fs, flat=True))
+        #
+        #     ttt = []
+        #     for fs, v in zip(faces_vols, vols):
+        #         fl = 0.0
+        #         fs2 = rng.subtract(rng.Range(fs), self.boundary_faces)
+        #         for f in fs2:
+        #             fl0 = self.mb.tag_get_data(self.flux_in_faces_tag, f, flat=True)[0]
+        #             fw = self.mb.tag_get_data(self.fw_in_faces_tag, f, flat=True)[0]
+        #             adjs = np.array(self.mb.get_adjacencies(f, 3))
+        #             sat2 = self.mb.tag_get_data(self.sat_tag, adjs, flat=True)
+        #             pf2 = self.mb.tag_get_data(self.pf_tag, adjs, flat=True)
+        #             if v == adjs[0]:
+        #                 fl += fl0*fw
+        #             else:
+        #                 fl -= fl0*fw
+        #
+        #         ttt.append(fl)
+        #
+        #     pdb.set_trace()
 
     def calculate_total_flux_v2(self, volumes, faces):
         mobi_in_faces = self.mb.tag_get_data(self.mobi_in_faces_tag, faces, flat=True)
