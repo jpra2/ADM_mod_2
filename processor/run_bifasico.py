@@ -566,8 +566,8 @@ if ADM:
         # testando = 'teste_' + str(loop) + '.vtk'
         # mb.write_file(testando, [vv])
 
-        if contador % 3 == 0:
-            os.system('clear')
+        # if contador % 3 == 0:
+        #     os.system('clear')
 
         if contador % q_impressao == 0:
             cont_imp += 1
@@ -690,8 +690,8 @@ elif ADM == False:
         dt = t3-t0
 
 
-        if contador % 3 == 0:
-            os.system('clear')
+        # if contador % 3 == 0:
+        #     os.system('clear')
 
         if contador % q_impressao == 0:
             cont_imp += 1

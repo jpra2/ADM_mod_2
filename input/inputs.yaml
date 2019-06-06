@@ -6,7 +6,7 @@ MPFA: False
 # estruturado ou nao
 bifasico: True
 # escoamento bifasico
-ADM: True
+ADM: False
 # solucao multiescala ADM
 
 ler_anterior: True

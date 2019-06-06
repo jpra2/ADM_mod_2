@@ -662,7 +662,7 @@ class sol_direta_bif:
 
     def print_hist(self, loop):
         name = 'historico_' + str(loop)
-        np.save(name, hist)
+        np.save(name, self.hist)
 
     def pol_interp(self, S):
         # S_temp = (S - self.Swc)/(1 - self.Swc - self.Sor)

@@ -117,7 +117,7 @@ else:
     while verif:
         cont += 1
         os.system('python rodarbif.py')
-        if cont > n:
+        if cont >= n:
             cont = 0
             pdb.set_trace()
 
