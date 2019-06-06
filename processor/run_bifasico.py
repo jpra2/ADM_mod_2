@@ -6,6 +6,7 @@ import scipy.sparse as sp
 from scipy.sparse import csc_matrix, csr_matrix, vstack, hstack, linalg, identity, find
 import yaml
 import io
+import sys
 import pdb
 import conversao as conv
 from utils import pymoab_utils as utpy
@@ -15,6 +16,8 @@ from processor import malha_adm as adm_mesh
 from processor import sol_adm_bifasico as sol_adm_bif
 from utils import bif_utils
 from processor import def_intermediarios as definter
+
+__all__ = []
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
@@ -34,9 +37,10 @@ with open("inputs.yaml", 'r') as stream:
     data_loaded = yaml.load(stream)
 
 ler_anterior = data_loaded['ler_anterior']
-loop_anterior = data_loaded['loop_anterior']
+# loop_anterior = data_loaded['loop_anterior']
 
 if ler_anterior:
+    loop_anterior = int(np.load('ultimo_loop.npy')[0])
     mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre, all_nodes, all_edges, all_faces, all_volumes, t_loop, vpi_ant = definter.carregar_dados_anterior(data_loaded, loop_anterior)
     tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
     pass
@@ -464,6 +468,7 @@ verif_vpi = False
 contador = 0
 ver9 = 1
 q_impressao = 10
+n_impressoes = 1
 #############################################
 
 vf = mb.create_meshset()
@@ -565,12 +570,19 @@ if ADM:
             os.system('clear')
 
         if contador % q_impressao == 0:
-            with open('tempos_simulacao_adm.txt', 'a+') as fil:
-                fil.write(str(dt)+'\n')
+            cont_imp += 1
             bif_utils.print_hist(loop-1)
             mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
-            pdb.set_trace()
+            with open('tempos_simulacao_adm.txt', 'a+') as fil:
+                fil.write(str(dt)+'\n')
+            os.chdir(input_dir)
+            ultimo_loop = np.array([loop-1])
+            np.save('ultimo_loop', ultimo_loop)
+            os.chdir(bifasico_sol_multiescala_dir)
+            if cont_imp >= n_impressoes:
+                sys.exit(0)
+
 
     tfim = time.time()
 
@@ -682,11 +694,19 @@ elif ADM == False:
             os.system('clear')
 
         if contador % q_impressao == 0:
-            with open('tempos_simulacao_direta.txt', 'a+') as fil:
-                fil.write(str(dt)+'\n')
+            cont_imp += 1
             bifasico.print_hist(loop-1)
             mb.write_file(ext_h5m)
             mb.write_file(ext_vtk, [vv])
+            with open('tempos_simulacao_direta.txt', 'a+') as fil:
+                fil.write(str(dt)+'\n')
+            os.chdir(input_dir)
+            ultimo_loop = np.array([loop-1])
+            np.save('ultimo_loop', ultimo_loop)
+            os.chdir(bifasico_sol_direta_dir)
+            if cont_imp >= n_impressoes:
+                sys.exit(0)
+
 
     tfim = time.time()
 

@@ -108,6 +108,19 @@ if bifasico == False:
 else:
     # loader = importlib.machinery.SourceFileLoader('run_bifasico', processor_dir + '/run_bifasico.py')
     # loader.load_module('run_bifasico')
-    import processor.run_bifasico
+    os.chdir(parent_dir)
+
+    n = 200
+    verif = True
+    cont = 0
+
+    while verif:
+        cont += 1
+        os.system('python rodarbif.py')
+        if cont > n:
+            cont = 0
+            pdb.set_trace()
+
+    # import processor.run_bifasico
 
     # from processor import run_bifasico
