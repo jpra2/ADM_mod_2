@@ -94,8 +94,10 @@ def create_names_tags():
 
 def set_p_with_gravity(mb, mtu, press_tag, all_nodes, wells_injector, wells_producer, gama_w, gama_o):
 
-    values_inj = (k_psi_to_pa)*mb.tag_get_data(press_tag, wells_injector, flat=True)
-    values_prod = (k_psi_to_pa)*mb.tag_get_data(press_tag, wells_producer, flat=True)
+    k_pe_to_m = 1.0
+    # k_pe_to_m = conv.pe_to_m(k_pe_to_m)
+    values_inj = mb.tag_get_data(press_tag, wells_injector, flat=True)
+    values_prod = mb.tag_get_data(press_tag, wells_producer, flat=True)
     coords = (k_pe_to_m)*mb.get_coords(all_nodes)
     coords = coords.reshape([len(all_nodes), 3])
     maxs = coords.max(axis=0)
@@ -161,35 +163,44 @@ def convert_to_SI_dep0(info):
         perm = perms[i]
         mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)
 
-def convert_to_SI(mb, p_tag, q_tag, k_harm_tag, cent_tag):
+def convert_to_SI(mb, p_tag, q_tag, k_harm_tag, cent_tag, all_volumes, all_faces):
 
-    mb = info['mb']
-    all_faces = info['all_faces']
-    all_volumes = info['all_volumes']
-    volumes_d = info['volumes_d']
-    cent_tag = info['cent_tag']
-    press_tag = info['press_tag']
-    area_tag = info['area_tag']
-    perm_tag = info['perm_tag']
-    k_eq_tag = info['k_eq_tag']
+    k_pe_to_m = 1.0
+    k_md_to_m2 = 1.0
+    k_psi_to_pa = 1.0
+    k_bbldia_to_m3seg = 1.0
+    k_pe_to_m = conv.pe_to_m(k_pe_to_m)
+    k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
+    k_psi_to_pa = conv.psi_to_Pa(k_psi_to_pa)
+    k_bbldia_to_m3seg = conv.bbldia_to_m3seg(k_bbldia_to_m3seg)
 
-    areas = (k_pe_to_m**2)*mb.tag_get_data(area_tag, all_faces, flat=True)
-    mb.tag_set_data(area_tag, all_faces, areas)
+    volumes_d = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([p_tag]), np.array([None]))
+    press_values = mb.tag_get_data(p_tag, volumes_d, flat=True)
+    # retirar 1e-3
+    press_values *= k_psi_to_pa*1e-3
+    mb.tag_set_data(p_tag, volumes_d, press_values)
 
-    press_values = (k_psi_to_pa)*mb.tag_get_data(press_tag, volumes_d, flat=True)
-    mb.tag_set_data(press_tag, volumes_d, press_values)
+    volumes_n = mb.get_entities_by_type_and_tag(0, types.MBHEX, np.array([q_tag]), np.array([None]))
+    if len(volumes_n) > 0:
+        q_values = mb.tag_get_data(q_tag, volumes_n, flat=True)
+        q_values *= k_bbldia_to_m3seg
+        mb.tag_set_data(q_tag, volumes_q, q_values)
+
+    k_harms = mb.tag_get_data(k_harm_tag, all_faces, flat=True)
+    k_harms *= k_md_to_m2*k_pe_to_m
+    mb.tag_set_data(k_harm_tag, all_faces, k_harms)
 
     centroids = (k_pe_to_m)*mb.tag_get_data(cent_tag, all_volumes)
     mb.tag_set_data(cent_tag, all_volumes, centroids)
-
-    # keqs = (k_pe_to_m**2)*(k_md_to_m2)*mb.tag_get_data(k_eq_tag, all_faces, flat=True)
-    # mb.tag_set_data(k_eq_tag, all_faces, keqs)
-
-    perms = mb.tag_get_data(perm_tag, all_volumes)
-
-    for i, v in enumerate(all_volumes):
-        perm = perms[i]
-        mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)
+    #
+    # # keqs = (k_pe_to_m**2)*(k_md_to_m2)*mb.tag_get_data(k_eq_tag, all_faces, flat=True)
+    # # mb.tag_set_data(k_eq_tag, all_faces, keqs)
+    #
+    # perms = mb.tag_get_data(perm_tag, all_volumes)
+    #
+    # for i, v in enumerate(all_volumes):
+    #     perm = perms[i]
+    #     mb.tag_set_data(perm_tag, v, k_md_to_m2*perm)
 
 def set_k1_test(mb, perm_tag, all_volumes, all_centroids):
     k01 = 1.0

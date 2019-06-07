@@ -110,7 +110,7 @@ else:
     # loader.load_module('run_bifasico')
     os.chdir(parent_dir)
 
-    n = 200
+    n = 100
     verif = True
     cont = 0
 

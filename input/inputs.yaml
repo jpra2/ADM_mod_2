@@ -1,6 +1,6 @@
 input_file: '30x30x45'
 
-gravity: False
+gravity: True
 # adicionar o efeito da gravidade
 MPFA: False
 # estruturado ou nao

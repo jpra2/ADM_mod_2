@@ -23,7 +23,7 @@ import importlib.machinery
 
 class sol_direta_bif:
 
-    def __init__(self, mb, mtu, all_volumes, data_loaded):
+    def __init__(self, mb, mtu, all_volumes, data_loaded, k_pe_m, k_md_to_m2):
         self.k2 = 0.5
         self.cfl_ini = self.k2
         self.cfl = self.k2
@@ -85,7 +85,7 @@ class sol_direta_bif:
         v0 = all_volumes[0]
         points = self.mtu.get_bridge_adjacencies(v0, 3, 0)
         # coords = (self.k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
-        coords = self.mb.get_coords(points).reshape(len(points), 3)
+        coords = (k_pe_m)*self.mb.get_coords(points).reshape(len(points), 3)
         maxs = coords.max(axis=0)
         mins = coords.min(axis=0)
         hs = maxs - mins
@@ -392,8 +392,8 @@ class sol_direta_bif:
                 sats_2[i] = sat1
                 continue
             qw = all_qw[i]
-            if qw < 0 and abs(qw) < lim_qw:
-                qw = 0.0
+            # if qw < 0 and abs(qw) < lim_qw:
+            #     qw = 0.0
 
             # if abs(qw) < lim:
             #     sats_2[i] = sat1
@@ -422,7 +422,12 @@ class sol_direta_bif:
                 qw_out = flux*fw
             else:
                 qw_out = 0.0
-            sat = sat1 + (qw - qw_out)*(self.delta_t/(fi*V))
+
+            w_in = (qw - qw_out)*self.delta_t
+            if w_in < 0 and abs(w_in < 9e-8):
+                w_in = 0.0
+            sat = sat1 + w_in/(fi*V)
+            # sat = sat1 + (qw - qw_out)*(self.delta_t/(fi*V))
             # sat = sat1 + qw*(self.delta_t/(self.fimin*self.Vmin))
             # if sat1 > sat + lim:
             #     print('erro na saturacao')

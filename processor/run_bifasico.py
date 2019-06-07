@@ -19,6 +19,8 @@ from processor import def_intermediarios as definter
 
 __all__ = []
 
+converter_unidades = True
+
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 parent_parent_dir = os.path.dirname(parent_dir)
 input_dir = os.path.join(parent_parent_dir, 'input')
@@ -48,12 +50,25 @@ else:
     definter.create_names_tags()
     mb, mtu, tags_1, input_file, ADM, tempos_impr, contar_loop, contar_tempo, imprimir_sempre = utpy.load_adm_mesh()
     all_nodes, all_edges, all_faces, all_volumes = utpy.get_all_entities(mb)
+    k_pe_m = 1.0
+    k_md_to_m2 = 1.0
+    if converter_unidades:
+        k_pe_m = conv.pe_to_m(k_pe_m)
+        k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
+        definter.convert_to_SI(mb, tags_1['P'], tags_1['Q'], tags_1['KHARM'], tags_1['CENT'], all_volumes, all_faces)
     definter.injector_producer_press(mb, mtu, float(data_loaded['dados_bifasico']['gama_w']), float(data_loaded['dados_bifasico']['gama_o']), data_loaded['gravity'], all_nodes)
     definter.criar_tags_bifasico(mb)
     tags_1['l3_ID'] = mb.tag_get_handle('l3_ID')
 
 adm_mesh = adm_mesh.malha_adm(mb, tags_1, input_file, mtu)
-bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded)
+
+k_pe_m = 1.0
+k_md_to_m2 = 1.0
+if converter_unidades:
+    k_pe_m = conv.pe_to_m(k_pe_m)
+    k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
+
+bif_utils = bif_utils.bifasico(mb, mtu, all_volumes, data_loaded, k_pe_m, k_md_to_m2)
 bif_utils.gravity = data_loaded['gravity']
 oth.gravity = bif_utils.gravity
 oth1 = oth(mb, mtu)
@@ -592,7 +607,12 @@ elif ADM == False:
     # loader = importlib.machinery.SourceFileLoader('bifasico_sol_direta', parent_dir + '/bifasico_sol_direta.py')
     # bifasico = loader.load_module('bifasico_sol_direta').sol_direta_bif(mb, mtu, all_volumes, data_loaded)
     from processor.bifasico_sol_direta import sol_direta_bif as bifasico
-    bifasico = bifasico(mb, mtu, all_volumes, data_loaded)
+    k_pe_m = 1.0
+    k_md_to_m2 = 1.0
+    if converter_unidades:
+        k_pe_m = conv.pe_to_m(k_pe_m)
+        k_md_to_m2 = conv.milidarcy_to_m2(k_md_to_m2)
+    bifasico = bifasico(mb, mtu, all_volumes, data_loaded, k_pe_m, k_md_to_m2)
     bifasico.gravity = bif_utils.gravity
     bifasico.mi_w = bif_utils.mi_w #Paxs
     bifasico.mi_o = bif_utils.mi_o
